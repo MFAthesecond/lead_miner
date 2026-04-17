@@ -114,8 +114,6 @@ module.exports = async function handler(req, res) {
   return res.json({
     ok: true,
     pages_scraped: pages.length,
-    offset,
-    next_offset: nextOffset,
     domains_found: allUrls.size,
     inserted,
   });
