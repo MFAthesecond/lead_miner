@@ -79,6 +79,29 @@ const ALL_PAGES = [
   'https://analyzify.com/shopify-stores/l/turkey',
 ];
 
+const DDG_QUERIES = [
+  'myshopify.com türkiye mağaza',
+  'myshopify.com istanbul alışveriş',
+  'myshopify.com kozmetik türkiye',
+  'myshopify.com spor giyim türkiye',
+  'myshopify.com takı aksesuar istanbul',
+  'myshopify.com kahve türk',
+  'myshopify.com organik doğal türkiye',
+  'myshopify.com giyim moda türkiye',
+  'myshopify.com ev dekorasyon türkiye',
+  'myshopify.com bebek çocuk türkiye',
+  'myshopify.com ayakkabı çanta türkiye',
+  'myshopify.com pet evcil hayvan türkiye',
+  'myshopify.com elektronik aksesuar türkiye',
+  'myshopify.com bijuteri gümüş türkiye',
+  'myshopify.com mobilya türkiye',
+  'myshopify.com halı kilim türkiye',
+  '.com.tr shopify mağaza',
+  '.com.tr "Powered by Shopify"',
+  'myshopify.com ankara izmir',
+  'myshopify.com antalya bursa',
+];
+
 const PAGES_PER_RUN = 3;
 
 function extractDomains(html, isSkailama) {
@@ -122,28 +145,67 @@ function extractDomains(html, isSkailama) {
   return domains;
 }
 
+async function searchDDG(query) {
+  const domains = new Set();
+  try {
+    const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return domains;
+    const html = await resp.text();
+    const $ = cheerio.load(html);
+    $('a.result__a').each((_, el) => {
+      const href = $(el).attr('href') || '';
+      const decoded = decodeURIComponent(href);
+      const m = decoded.match(/uddg=(https?[^&]+)/);
+      if (!m) return;
+      try {
+        const u = new URL(m[1]);
+        const host = u.hostname.toLowerCase();
+        if (host.includes('myshopify.com') ||
+            (host.endsWith('.com.tr') && !host.includes('shopify.com') && !host.includes('google'))) {
+          const d = 'https://' + host;
+          if (!isBigBrand(d)) domains.add(d);
+        }
+      } catch {}
+    });
+  } catch {}
+  return domains;
+}
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
   const supabase = getSupabase();
-
-  // Her çağrıda rastgele 3 sayfa seç - zamanla hepsini tarar
-  const shuffled = [...ALL_PAGES].sort(() => Math.random() - 0.5);
-  const pages = shuffled.slice(0, PAGES_PER_RUN);
-
   const allUrls = new Set();
+  let source = '';
 
-  for (const url of pages) {
-    try {
-      const resp = await fetch(url, {
-        headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
-        signal: AbortSignal.timeout(5000),
-      });
-      if (!resp.ok) continue;
-      const html = await resp.text();
-      const isSkailama = url.includes('skailama');
-      for (const d of extractDomains(html, isSkailama)) allUrls.add(d);
-    } catch {}
+  // %50 ihtimalle DuckDuckGo, %50 ihtimalle sayfa tarama
+  const useDDG = Math.random() < 0.5;
+
+  if (useDDG) {
+    source = 'duckduckgo';
+    const query = DDG_QUERIES[Math.floor(Math.random() * DDG_QUERIES.length)];
+    const found = await searchDDG(query);
+    for (const d of found) allUrls.add(d);
+  } else {
+    source = 'pages';
+    const shuffled = [...ALL_PAGES].sort(() => Math.random() - 0.5);
+    const pages = shuffled.slice(0, PAGES_PER_RUN);
+    for (const url of pages) {
+      try {
+        const resp = await fetch(url, {
+          headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!resp.ok) continue;
+        const html = await resp.text();
+        const isSkailama = url.includes('skailama');
+        for (const d of extractDomains(html, isSkailama)) allUrls.add(d);
+      } catch {}
+    }
   }
 
   // Upsert
@@ -162,7 +224,7 @@ module.exports = async function handler(req, res) {
 
   return res.json({
     ok: true,
-    pages_scraped: pages.length,
+    source,
     domains_found: allUrls.size,
     inserted,
   });
