@@ -13,6 +13,8 @@ module.exports = async function handler(req, res) {
   const supabase = getSupabase();
 
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
     const { phone, whatsapp, instagram, category, min_followers, max_followers, tag } = req.query;
 
     let query = supabase
