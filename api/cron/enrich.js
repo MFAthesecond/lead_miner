@@ -23,7 +23,7 @@ const SOCIAL_RX = {
 
 const EMAIL_RX    = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const WA_RX       = /(?:wa\.me\/|whatsapp\.com\/send[^"]*phone=)(\d+)/gi;
-const BATCH_SIZE  = 10;
+const BATCH_SIZE  = 50;
 
 async function fetchPage(url) {
   try {
