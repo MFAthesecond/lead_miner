@@ -257,7 +257,8 @@ const DDG_QUERIES = [
   'myshopify.com "kapıda ödeme"',
 ];
 
-const PAGES_PER_RUN = 3;
+const PAGES_PER_RUN = 5;
+const DDG_PER_RUN = 3;
 
 function extractDomains(html, isSkailama) {
   const $ = cheerio.load(html);
@@ -337,30 +338,29 @@ module.exports = async function handler(req, res) {
   const allUrls = new Set();
   let source = '';
 
-  // %50 ihtimalle DuckDuckGo, %50 ihtimalle sayfa tarama
-  const useDDG = Math.random() < 0.5;
+  // Sayfa tarama + DDG ayni anda paralel
+  source = 'pages+ddg';
 
-  if (useDDG) {
-    source = 'duckduckgo';
-    const query = DDG_QUERIES[Math.floor(Math.random() * DDG_QUERIES.length)];
-    const found = await searchDDG(query);
-    for (const d of found) allUrls.add(d);
-  } else {
-    source = 'pages';
-    const shuffled = [...ALL_PAGES].sort(() => Math.random() - 0.5);
-    const pages = shuffled.slice(0, PAGES_PER_RUN);
-    for (const url of pages) {
-      try {
-        const resp = await fetch(url, {
-          headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
-          signal: AbortSignal.timeout(5000),
-        });
-        if (!resp.ok) continue;
-        const html = await resp.text();
-        const isSkailama = url.includes('skailama');
-        for (const d of extractDomains(html, isSkailama)) allUrls.add(d);
-      } catch {}
-    }
+  const shuffledPages = [...ALL_PAGES].sort(() => Math.random() - 0.5).slice(0, PAGES_PER_RUN);
+  const shuffledDDG = [...DDG_QUERIES].sort(() => Math.random() - 0.5).slice(0, DDG_PER_RUN);
+
+  const pagePs = shuffledPages.map(async (url) => {
+    try {
+      const resp = await fetch(url, {
+        headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!resp.ok) return [];
+      const html = await resp.text();
+      return [...extractDomains(html, url.includes('skailama'))];
+    } catch { return []; }
+  });
+
+  const ddgPs = shuffledDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
+
+  const results = await Promise.all([...pagePs, ...ddgPs]);
+  for (const domains of results) {
+    for (const d of domains) allUrls.add(d);
   }
 
   // Upsert
