@@ -209,7 +209,20 @@ function getFiltered(){
     return true;
   });
 
-  if(sortCol>=0) arr=sortData(arr);
+  // Taglenenler her zaman uste
+  const TAG_ORDER = {'Musteri':1,'Ilgileniyor':2,'Teklif Verildi':3,'Arandi':4,'Sonra Ara':5,'Reddetti':6};
+  arr.sort((a,b)=>{
+    const ta = a.tag ? (TAG_ORDER[a.tag]||7) : 99;
+    const tb = b.tag ? (TAG_ORDER[b.tag]||7) : 99;
+    if(ta !== tb) return ta - tb;
+    return 0;
+  });
+
+  if(sortCol>=0) {
+    const tagged = arr.filter(d=>d.tag);
+    const untagged = arr.filter(d=>!d.tag);
+    arr = [...tagged, ...sortData(untagged)];
+  }
   return arr;
 }
 
