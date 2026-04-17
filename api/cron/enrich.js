@@ -23,14 +23,14 @@ const SOCIAL_RX = {
 
 const EMAIL_RX    = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const WA_RX       = /(?:wa\.me\/|whatsapp\.com\/send[^"]*phone=)(\d+)/gi;
-const BATCH_SIZE  = 50;
+const BATCH_SIZE  = 3;
 
 async function fetchPage(url) {
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
       redirect: 'follow',
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!resp.ok) return null;
     return resp.text();
@@ -156,7 +156,7 @@ async function enrichOne(url) {
   try {
     const pResp = await fetch(new URL('/products.json?limit=250', url).href, {
       headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
     if (pResp.ok) {
       const pData = await pResp.json();
@@ -209,7 +209,7 @@ module.exports = async function handler(req, res) {
       enriched++;
     }
 
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 500));
   }
 
   return res.json({ ok: true, enriched, total: rows.length });

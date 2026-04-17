@@ -2,8 +2,8 @@ const { getSupabase, verifyCron } = require('../_lib/supabase');
 
 const IG_UA = 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)';
 const IG_APP_ID = '936619743392459';
-const BATCH_SIZE = 50;
-const DELAY_MS = 3000;
+const BATCH_SIZE = 5;
+const DELAY_MS = 1000;
 
 async function getFollowers(username) {
   const endpoints = [
