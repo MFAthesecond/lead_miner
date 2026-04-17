@@ -38,7 +38,7 @@ lead_miner/
 ## Cron Jobs (cron-job.org'da tanımlı)
 | Job | URL | Schedule | Batch |
 |---|---|---|---|
-| Discover | /api/cron/discover | */10 * * * * | 3 sayfa veya 1 DDG sorgusu |
+| Discover | /api/cron/discover | */3 * * * * | 3 sayfa veya 1 DDG sorgusu |
 | Enrich | /api/cron/enrich | */1 * * * * | 2 site |
 | Instagram | /api/cron/instagram | */30 * * * * | 5 hesap |
 
@@ -54,12 +54,16 @@ lead_miner/
 - `CRON_SECRET` (opsiyonel)
 
 ## Keşif Kaynakları
-1. **Store Leads** (storeleads.app) - 25 şehir sayfası, 15 region sayfası, 17 kategori sayfası, 6 app sayfası
+1. **Store Leads** (storeleads.app) - 55 şehir, 24 region, 21 kategori, 24 app (TR filtreli), 5 teknoloji sayfası
 2. **CartInsight** - Türk mağaza tablosu
 3. **Skailama** - Türk mağaza listesi
 4. **AfterShip** - Top 100 TR
 5. **Analyzify** - Türk mağaza listesi
-6. **DuckDuckGo** - 20 Türkçe arama sorgusu (myshopify.com + niche)
+6. **EcommerceDB** - TR Shopify ranking
+7. **ShopiStores** - Turkey mağaza listesi
+8. **BuiltWith Trends** - Shopify/Turkey
+9. **SimilarTech** - Shopify/Turkey
+10. **DuckDuckGo** - 90+ Türkçe arama sorgusu (myshopify.com + niche/şehir/ödeme kalıpları)
 
 ## Akış
 1. **Discover** yeni URL bulur → `shopify_stores`'a `enriched_at=NULL` olarak ekler

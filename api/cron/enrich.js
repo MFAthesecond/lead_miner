@@ -23,7 +23,7 @@ const SOCIAL_RX = {
 
 const EMAIL_RX    = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
 const WA_RX       = /(?:wa\.me\/|whatsapp\.com\/send[^"]*phone=)(\d+)/gi;
-const BATCH_SIZE  = 2;
+const BATCH_SIZE  = 5;
 
 async function fetchPage(url) {
   try {
@@ -123,18 +123,25 @@ function guessCategory(name, desc) {
 }
 
 async function enrichOne(url) {
-  const mainHtml = await fetchPage(url);
+  // Tum istekleri paralel baslat
+  const contactPs = CONTACT_PATHS.slice(0, 3).map(p =>
+    fetchPage(new URL(p, url).href).catch(() => null)
+  );
+  const productsP = fetch(new URL('/products.json?limit=250', url).href, {
+    headers: { 'User-Agent': UA },
+    signal: AbortSignal.timeout(4000),
+  }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+  const [mainHtml, ...contactResults] = await Promise.all([
+    fetchPage(url), ...contactPs
+  ]);
+  const productsData = await productsP;
+
   if (!mainHtml) return { error: 'unreachable' };
 
   const isShopify = SHOPIFY_SIGS.some(s => mainHtml.toLowerCase().includes(s.toLowerCase()));
-
-  let allHtml = mainHtml;
-  for (const path of CONTACT_PATHS) {
-    try {
-      const contactHtml = await fetchPage(new URL(path, url).href);
-      if (contactHtml) { allHtml += '\n' + contactHtml; break; }
-    } catch {}
-  }
+  const contactHtml = contactResults.find(h => h) || '';
+  const allHtml = mainHtml + '\n' + contactHtml;
 
   const cheerio = require('cheerio');
   const $ = cheerio.load(mainHtml);
@@ -147,34 +154,17 @@ async function enrichOne(url) {
   else if (mainHtml.includes('€') || mainHtml.includes('EUR')) currency = 'EUR';
   else if (mainHtml.includes('$') || mainHtml.includes('USD')) currency = 'USD';
 
-  const emails = extractEmails(allHtml);
-  const phones = extractPhones(allHtml);
-  const socials = extractSocials(allHtml);
-  const whatsapp = extractWhatsapp(allHtml);
-
-  let productCount = null;
-  try {
-    const pResp = await fetch(new URL('/products.json?limit=250', url).href, {
-      headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(4000),
-    });
-    if (pResp.ok) {
-      const pData = await pResp.json();
-      productCount = (pData.products || []).length;
-    }
-  } catch {}
-
   return {
     store_name: title || null,
-    emails,
-    phones,
-    instagram: socials.instagram ? `https://instagram.com/${socials.instagram}` : null,
-    facebook: socials.facebook ? `https://facebook.com/${socials.facebook}` : null,
-    tiktok: socials.tiktok ? `https://tiktok.com/@${socials.tiktok}` : null,
-    whatsapp: whatsapp || null,
+    emails: extractEmails(allHtml),
+    phones: extractPhones(allHtml),
+    instagram: extractSocials(allHtml).instagram ? `https://instagram.com/${extractSocials(allHtml).instagram}` : null,
+    facebook: extractSocials(allHtml).facebook ? `https://facebook.com/${extractSocials(allHtml).facebook}` : null,
+    tiktok: extractSocials(allHtml).tiktok ? `https://tiktok.com/@${extractSocials(allHtml).tiktok}` : null,
+    whatsapp: extractWhatsapp(allHtml) || null,
     category: guessCategory(title, description),
     currency,
-    product_count: productCount,
+    product_count: productsData ? (productsData.products || []).length : null,
     description,
     is_shopify: isShopify,
   };
@@ -194,23 +184,19 @@ module.exports = async function handler(req, res) {
   if (error) return res.status(500).json({ error: error.message });
   if (!rows || rows.length === 0) return res.json({ ok: true, enriched: 0, message: 'Nothing to enrich' });
 
-  let enriched = 0;
-  for (const row of rows) {
+  const results = await Promise.all(rows.map(async (row) => {
     const data = await enrichOne(row.url);
-
     if (data.error) {
       await supabase.from('shopify_stores')
         .update({ enriched_at: new Date().toISOString(), is_shopify: false })
         .eq('id', row.id);
-    } else {
-      await supabase.from('shopify_stores')
-        .update({ ...data, enriched_at: new Date().toISOString() })
-        .eq('id', row.id);
-      enriched++;
+      return false;
     }
+    await supabase.from('shopify_stores')
+      .update({ ...data, enriched_at: new Date().toISOString() })
+      .eq('id', row.id);
+    return true;
+  }));
 
-    await new Promise(r => setTimeout(r, 500));
-  }
-
-  return res.json({ ok: true, enriched, total: rows.length });
+  return res.json({ ok: true, enriched: results.filter(Boolean).length, total: rows.length });
 };
