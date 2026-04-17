@@ -32,9 +32,8 @@ const JUNK_TITLES = [
 function isJunkTitle(title) {
   if (!title || title.length < 2) return true;
   const t = title.toLowerCase().trim();
-  if (t.length > 100) return true;
-  if (JUNK_TITLES.some(j => t === j || t.startsWith(j + ' ') || t === j.replace(/ /g, ''))) return true;
-  if (/^[^a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}$/.test(t)) return true;
+  if (JUNK_TITLES.some(j => t === j || t === j.replace(/ /g, ''))) return true;
+  if (/^[^a-zA-ZçğıöşüÇĞİÖŞÜ0-9]{3,}$/.test(t)) return true;
   if (/^(test|demo|example)\d*$/i.test(t)) return true;
   return false;
 }
@@ -124,6 +123,45 @@ function extractWhatsapp(html) {
   return '';
 }
 
+const IG_JUNK_USERS = new Set([
+  'share','sharer','intent','dialog','p','reel','reels','explore',
+  'accounts','about','developer','legal','privacy','terms',
+  'shopify','instagram','stories','direct','tv',
+]);
+
+async function searchInstagramDDG(storeName) {
+  if (!storeName || storeName.length < 2) return null;
+  try {
+    const query = `${storeName} instagram`;
+    const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!resp.ok) return null;
+    const html = await resp.text();
+    const cheerio = require('cheerio');
+    const $ = cheerio.load(html);
+    const igRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})/gi;
+    const candidates = new Map();
+
+    $('a.result__a, .result__snippet').each((_, el) => {
+      const text = $(el).text() + ' ' + ($(el).attr('href') || '');
+      let m;
+      while ((m = igRx.exec(text)) !== null) {
+        const user = m[1].toLowerCase().replace(/\/$/, '');
+        if (!IG_JUNK_USERS.has(user) && user.length >= 2) {
+          candidates.set(user, (candidates.get(user) || 0) + 1);
+        }
+      }
+    });
+
+    if (candidates.size === 0) return null;
+    const sorted = [...candidates.entries()].sort((a, b) => b[1] - a[1]);
+    return sorted[0][0];
+  } catch { return null; }
+}
+
 function guessCategory(name, desc) {
   const text = `${name} ${desc}`.toLowerCase();
   const cats = {
@@ -186,7 +224,13 @@ async function enrichOne(url) {
   else if (mainHtml.includes('$') || mainHtml.includes('USD')) currency = 'USD';
 
   const socials = extractSocials(allHtml);
-  const igUser = socials.instagram || null;
+  let igUser = socials.instagram || null;
+
+  if (!igUser) {
+    const ddgIg = await searchInstagramDDG(title);
+    if (ddgIg) igUser = ddgIg;
+  }
+
   const igUrl = igUser ? `https://instagram.com/${igUser}` : null;
 
   let igFollowers = 0;
