@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
 
     let query = supabase
       .from('shopify_stores')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('is_shopify', true)
       .not('enriched_at', 'is', null)
       .order('ig_followers', { ascending: false, nullsFirst: false });
@@ -32,9 +32,21 @@ module.exports = async function handler(req, res) {
     if (min_followers) query = query.gte('ig_followers', parseInt(min_followers));
     if (max_followers) query = query.lte('ig_followers', parseInt(max_followers));
 
-    const { data, error } = await query.limit(500);
-    if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+    const allData = [];
+    const PAGE = 1000;
+    let from = 0;
+    let totalCount = null;
+    while (true) {
+      const { data, error, count } = await query.range(from, from + PAGE - 1);
+      if (error) return res.status(500).json({ error: error.message });
+      if (totalCount === null) totalCount = count;
+      if (!data || data.length === 0) break;
+      allData.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+
+    return res.json({ rows: allData, total: totalCount });
   }
 
   if (req.method === 'PATCH') {

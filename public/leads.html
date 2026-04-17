@@ -96,7 +96,8 @@ const TAG_CLASS = {
 async function load(){
   try{
     const r=await fetch('/api/leads');
-    DATA=await r.json();
+    const json=await r.json();
+    DATA = json.rows || json;
   }catch(e){
     document.getElementById('tableWrap').innerHTML='<div class="loading">Veri yuklenemedi</div>';
     return;
