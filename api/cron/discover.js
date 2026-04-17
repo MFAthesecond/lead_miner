@@ -2,7 +2,9 @@ const { getSupabase, verifyCron, UA, BIG_BRANDS, isBigBrand, domainFromUrl } = r
 const cheerio = require('cheerio');
 
 const ALL_PAGES = [
+  // Store Leads - ana sayfa
   'https://storeleads.app/reports/shopify/TR/top-stores',
+  // Store Leads - sehirler (25 sehir)
   'https://storeleads.app/reports/shopify/TR/city/%c4%b0stanbul',
   'https://storeleads.app/reports/shopify/TR/city/Ankara',
   'https://storeleads.app/reports/shopify/TR/city/%c4%b0zmir',
@@ -17,6 +19,34 @@ const ALL_PAGES = [
   'https://storeleads.app/reports/shopify/TR/city/Kocaeli',
   'https://storeleads.app/reports/shopify/TR/city/Trabzon',
   'https://storeleads.app/reports/shopify/TR/city/Samsun',
+  'https://storeleads.app/reports/shopify/TR/city/Malatya',
+  'https://storeleads.app/reports/shopify/TR/city/Manisa',
+  'https://storeleads.app/reports/shopify/TR/city/Hatay',
+  'https://storeleads.app/reports/shopify/TR/city/Diyarbak%c4%b1r',
+  'https://storeleads.app/reports/shopify/TR/city/%c5%9eanl%c4%b1urfa',
+  'https://storeleads.app/reports/shopify/TR/city/Eski%c5%9fehir',
+  'https://storeleads.app/reports/shopify/TR/city/Tekirda%c4%9f',
+  'https://storeleads.app/reports/shopify/TR/city/Sakarya',
+  'https://storeleads.app/reports/shopify/TR/city/Ayd%c4%b1n',
+  'https://storeleads.app/reports/shopify/TR/city/Bal%c4%b1kesir',
+  'https://storeleads.app/reports/shopify/TR/city/Mu%c4%9fla',
+  // Store Leads - bolgeler (region, sehirden farkli veriler doner)
+  'https://storeleads.app/reports/shopify/TR/region/%C4%B0stanbul',
+  'https://storeleads.app/reports/shopify/TR/region/Ankara',
+  'https://storeleads.app/reports/shopify/TR/region/%C4%B0zmir',
+  'https://storeleads.app/reports/shopify/TR/region/Bursa',
+  'https://storeleads.app/reports/shopify/TR/region/Antalya',
+  'https://storeleads.app/reports/shopify/TR/region/Denizli',
+  'https://storeleads.app/reports/shopify/TR/region/Kayseri',
+  'https://storeleads.app/reports/shopify/TR/region/Konya',
+  'https://storeleads.app/reports/shopify/TR/region/Gaziantep',
+  'https://storeleads.app/reports/shopify/TR/region/Kocaeli',
+  'https://storeleads.app/reports/shopify/TR/region/Mersin',
+  'https://storeleads.app/reports/shopify/TR/region/Adana',
+  'https://storeleads.app/reports/shopify/TR/region/Trabzon',
+  'https://storeleads.app/reports/shopify/TR/region/Samsun',
+  'https://storeleads.app/reports/shopify/TR/region/Mu%C4%9Fla',
+  // Store Leads - kategoriler (12 kategori)
   'https://storeleads.app/reports/shopify/TR/category/Apparel',
   'https://storeleads.app/reports/shopify/TR/category/Home%20%26%20Garden',
   'https://storeleads.app/reports/shopify/TR/category/Beauty%20%26%20Fitness',
@@ -26,8 +56,27 @@ const ALL_PAGES = [
   'https://storeleads.app/reports/shopify/TR/category/Sports',
   'https://storeleads.app/reports/shopify/TR/category/Consumer%20Electronics',
   'https://storeleads.app/reports/shopify/TR/category/Toys%20%26%20Hobbies',
+  'https://storeleads.app/reports/shopify/TR/category/Arts%20%26%20Entertainment',
+  'https://storeleads.app/reports/shopify/TR/category/Gifts%20%26%20Special%20Events',
+  'https://storeleads.app/reports/shopify/TR/category/Autos%20%26%20Vehicles',
+  'https://storeleads.app/reports/shopify/TR/category/People%20%26%20Society',
+  'https://storeleads.app/reports/shopify/TR/category/Business%20%26%20Industrial',
+  'https://storeleads.app/reports/shopify/TR/category/Books%20%26%20Literature',
+  'https://storeleads.app/reports/shopify/TR/category/Computers',
+  'https://storeleads.app/reports/shopify/TR/category/Games',
+  'https://storeleads.app/reports/shopify/TR/category/Travel',
+  // Store Leads - Turk Shopify app kullanicilari
+  'https://storeleads.app/reports/shopify/app/e-ticaret-sozlesmeleri',
+  'https://storeleads.app/reports/shopify/app/kargo-yonetimi',
+  'https://storeleads.app/reports/shopify/app/judgeme',
+  'https://storeleads.app/reports/shopify/app/pagefly',
+  'https://storeleads.app/reports/shopify/app/loox',
+  'https://storeleads.app/reports/shopify/app/instafeed',
+  // Diger kaynaklar
   'https://www.cartinsight.io/shopify-stores-in-turkey/',
   'https://www.skailama.com/shopify-stores/turkey',
+  'https://www.aftership.com/store-list/top-100-tr-shopify-stores',
+  'https://analyzify.com/shopify-stores/l/turkey',
 ];
 
 const PAGES_PER_RUN = 3;
