@@ -154,13 +154,39 @@ async function enrichOne(url) {
   else if (mainHtml.includes('€') || mainHtml.includes('EUR')) currency = 'EUR';
   else if (mainHtml.includes('$') || mainHtml.includes('USD')) currency = 'USD';
 
+  const socials = extractSocials(allHtml);
+  const igUser = socials.instagram || null;
+  const igUrl = igUser ? `https://instagram.com/${igUser}` : null;
+
+  let igFollowers = 0;
+  if (igUser) {
+    try {
+      const igResp = await fetch(
+        `https://i.instagram.com/api/v1/users/web_profile_info/?username=${igUser}`,
+        {
+          headers: {
+            'User-Agent': 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)',
+            'X-IG-App-ID': '936619743392459',
+          },
+          signal: AbortSignal.timeout(4000),
+        }
+      );
+      if (igResp.ok) {
+        const igData = await igResp.json();
+        igFollowers = igData?.data?.user?.edge_followed_by?.count || 0;
+      }
+    } catch {}
+  }
+
   return {
     store_name: title || null,
     emails: extractEmails(allHtml),
     phones: extractPhones(allHtml),
-    instagram: extractSocials(allHtml).instagram ? `https://instagram.com/${extractSocials(allHtml).instagram}` : null,
-    facebook: extractSocials(allHtml).facebook ? `https://facebook.com/${extractSocials(allHtml).facebook}` : null,
-    tiktok: extractSocials(allHtml).tiktok ? `https://tiktok.com/@${extractSocials(allHtml).tiktok}` : null,
+    instagram: igUrl,
+    ig_followers: igFollowers,
+    ig_fetched_at: igUrl ? new Date().toISOString() : null,
+    facebook: socials.facebook ? `https://facebook.com/${socials.facebook}` : null,
+    tiktok: socials.tiktok ? `https://tiktok.com/@${socials.tiktok}` : null,
     whatsapp: extractWhatsapp(allHtml) || null,
     category: guessCategory(title, description),
     currency,
