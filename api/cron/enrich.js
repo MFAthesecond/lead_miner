@@ -15,6 +15,30 @@ const CONTACT_PATHS = [
 
 const SHOPIFY_SIGS = ['cdn.shopify.com','Shopify.theme','shopify-section','myshopify.com','shopify_analytics'];
 
+const JUNK_TITLES = [
+  'log in','login','sign in','signin','sign up','signup','register',
+  'test','test store','my store','my shop','example','demo',
+  '404','not found','page not found','sayfa bulunamadı',
+  'access denied','forbidden','error','hata',
+  'coming soon','under construction','maintenance','bakımda',
+  'password','parola','şifre',
+  'account','hesap','hesabım',
+  'cart','checkout','sepet','ödeme',
+  'untitled','başlıksız','home','homepage','anasayfa',
+  'welcome to','just another','powered by shopify',
+  'create account','reset password','verify',
+];
+
+function isJunkTitle(title) {
+  if (!title || title.length < 2) return true;
+  const t = title.toLowerCase().trim();
+  if (t.length > 100) return true;
+  if (JUNK_TITLES.some(j => t === j || t.startsWith(j + ' ') || t === j.replace(/ /g, ''))) return true;
+  if (/^[^a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}$/.test(t)) return true;
+  if (/^(test|demo|example)\d*$/i.test(t)) return true;
+  return false;
+}
+
 const SOCIAL_RX = {
   instagram: /https?:\/\/(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/i,
   facebook:  /https?:\/\/(?:www\.)?facebook\.com\/([a-zA-Z0-9_.]+)/i,
@@ -148,6 +172,8 @@ async function enrichOne(url) {
   const title = $('title').text().trim().split(/[|–-]/)[0].trim();
   const descMeta = $('meta[name="description"]').attr('content') || '';
   const description = descMeta.slice(0, 200);
+
+  if (isJunkTitle(title)) return { error: 'junk_title' };
 
   let currency = null;
   if (mainHtml.includes('₺') || mainHtml.includes('TRY')) currency = 'TRY';
