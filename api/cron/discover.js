@@ -293,15 +293,35 @@ async function searchDDG(query) {
   return domains;
 }
 
+async function searchCrtSh() {
+  const domains = new Set();
+  try {
+    const resp = await fetch(
+      'https://crt.sh/?q=%25.myshopify.com&output=json&limit=200',
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (!resp.ok) return domains;
+    const data = await resp.json();
+    // Rastgele 50 tanesini sec (her cagri farkli batch)
+    const valid = data
+      .map(c => (c?.common_name || '').toLowerCase())
+      .filter(n => n.endsWith('.myshopify.com') && !n.startsWith('*') && n.length < 60);
+    const shuffled = valid.sort(() => Math.random() - 0.5).slice(0, 50);
+    for (const name of shuffled) {
+      if (!isBigBrand(`https://${name}`)) {
+        domains.add(`https://${name}`);
+      }
+    }
+  } catch {}
+  return domains;
+}
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
   const supabase = getSupabase();
   const allUrls = new Set();
-  let source = '';
-
-  // Sayfa tarama + DDG ayni anda paralel
-  source = 'pages+ddg';
+  let source = 'pages+ddg+crtsh';
 
   const shuffledPages = [...ALL_PAGES].sort(() => Math.random() - 0.5).slice(0, PAGES_PER_RUN);
   const shuffledDDG = [...DDG_QUERIES].sort(() => Math.random() - 0.5).slice(0, DDG_PER_RUN);
@@ -319,8 +339,9 @@ module.exports = async function handler(req, res) {
   });
 
   const ddgPs = shuffledDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
+  const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
 
-  const results = await Promise.all([...pagePs, ...ddgPs]);
+  const results = await Promise.all([...pagePs, ...ddgPs, crtP]);
   for (const domains of results) {
     for (const d of domains) allUrls.add(d);
   }
