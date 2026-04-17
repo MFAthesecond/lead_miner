@@ -169,7 +169,12 @@ async function enrichOne(url) {
 
   const cheerio = require('cheerio');
   const $ = cheerio.load(mainHtml);
-  const title = $('title').text().trim().split(/[|–-]/)[0].trim();
+  let title = $('title').text().trim().split(/[|–-]/)[0].trim();
+  const PAYMENT_NOISE = ['American Express','Apple Pay','Diners Club','Discover',
+    'Google Pay','Mastercard','PayPal','Shop Pay','Visa','Union Pay',
+    'Maestro','JCB','Boleto','Lock icon','Shopify logo'];
+  for (const pw of PAYMENT_NOISE) title = title.replaceAll(pw, '');
+  title = title.replace(/\n/g, ' ').replace(/\s{2,}/g, ' ').trim();
   const descMeta = $('meta[name="description"]').attr('content') || '';
   const description = descMeta.slice(0, 200);
 

@@ -76,6 +76,22 @@ const NON_TURKISH_IDS = [
   525,  // Protech Brasil - USD, Brazilian
 ];
 
+const WHITELIST_IDS = new Set([
+  183,  // Üç (ucel.com.tr) - gerçek Türk mağaza
+  614,  // Ab (ab-igul.com) - gerçek Türk mağaza
+  573,  // Limited Run Games - kullanıcı istedi
+  835,  // Artinart - payment spam ama gerçek TR mağaza
+  976,  // Veyro Tech Global - payment spam ama gerçek
+  977,  // royalapexllc - My Store ama kullanıcı karar verdi
+  676,  // MEBU Concept - payment spam ama gerçek TR
+  1325, // Sculpture - payment spam ama gerçek TR
+  3300, // Turgay's Watches - payment spam ama gerçek TR
+  533,  // Birdiejay - payment spam ama gerçek TR
+  1349, // Healthco - payment spam ama gerçek TR
+  2181, // Yontu - payment spam ama gerçek TR
+  577,  // Opti+Life - payment spam
+]);
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -90,6 +106,7 @@ module.exports = async function handler(req, res) {
 
   const junkRows = [];
   for (const r of rows) {
+    if (WHITELIST_IDS.has(r.id)) continue;
     const reason = isJunkStore(r);
     if (reason) {
       junkRows.push({ ...r, reason });
@@ -125,5 +142,27 @@ module.exports = async function handler(req, res) {
     if (!upErr) cleaned += batch.length;
   }
 
-  return res.json({ ok: true, total_stores: rows.length, cleaned, remaining: rows.length - cleaned });
+  const PAYMENT_WORDS = ['American Express','Apple Pay','Diners Club','Discover',
+    'Google Pay','Mastercard','PayPal','Shop Pay','Visa','Union Pay',
+    'Maestro','JCB','Boleto','Elo','Hypercard','Bancontact','iDEAL','Wero',
+    'Visa Electron','Person','Lock icon','Shopify logo','arrow',
+    'SearchRight','Right arrow long','belluserminusplusbarsfile','iconYouTube','iconPinterest',
+    'icon','account icon'];
+  const whitelistRows = rows.filter(r => WHITELIST_IDS.has(r.id));
+  let namesFixed = 0;
+  for (const r of whitelistRows) {
+    let name = r.store_name || '';
+    if (!name) continue;
+    let cleaned_name = name.split('\n')[0].trim();
+    for (const pw of PAYMENT_WORDS) {
+      cleaned_name = cleaned_name.replaceAll(pw, '');
+    }
+    cleaned_name = cleaned_name.replace(/\s{2,}/g, ' ').trim();
+    if (cleaned_name !== name) {
+      await supabase.from('shopify_stores').update({ store_name: cleaned_name }).eq('id', r.id);
+      namesFixed++;
+    }
+  }
+
+  return res.json({ ok: true, total_stores: rows.length, cleaned, remaining: rows.length - cleaned, names_fixed: namesFixed });
 };
