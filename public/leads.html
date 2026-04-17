@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shopify Lead Finder</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;padding:20px}
+    .container{max-width:1500px;margin:0 auto}
+    h1{font-size:24px;margin-bottom:4px}
+    .subtitle{color:#666;margin-bottom:20px;font-size:13px}
+    .stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+    .stat{background:#fff;border-radius:10px;padding:14px 20px;box-shadow:0 1px 3px rgba(0,0,0,.08);min-width:120px}
+    .stat .n{font-size:26px;font-weight:700;color:#5b5ea6}
+    .stat .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px}
+    .filters{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .filters input[type=text]{padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:220px}
+    .filters select{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:#fff}
+    .filters label{font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap}
+    #count{margin-left:auto;color:#888;font-size:12px}
+    table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+    th{background:#5b5ea6;color:#fff;padding:10px 12px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
+    th:hover{background:#4a4d95}
+    th .arr{font-size:9px;margin-left:3px;opacity:.4}
+    th.sorted .arr{opacity:1}
+    td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
+    tr:hover{background:#f8f9ff}
+    tr.hp{background:#f0fff4}
+    tr.hp:hover{background:#e6ffec}
+    .nm{font-weight:600;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    a{color:#5b5ea6;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .e{color:#ccc}
+    .badge{background:#eef;color:#5b5ea6;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap}
+    .ig{text-align:right;font-variant-numeric:tabular-nums}
+    .loading{text-align:center;padding:60px;color:#888;font-size:16px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Shopify Lead Finder</h1>
+  <p class="subtitle">Erkam'in Ajansi - Otomatik guncellenir</p>
+  <div class="stats" id="stats"></div>
+  <div class="filters">
+    <input type="text" id="search" placeholder="Magaza ara..." oninput="applyFilters()">
+    <select id="catF" onchange="applyFilters()"><option value="">Tum Kategoriler</option></select>
+    <label><input type="checkbox" id="fPhone" onchange="applyFilters()"> Telefonlu</label>
+    <label><input type="checkbox" id="fWa" onchange="applyFilters()"> WhatsApp</label>
+    <label><input type="checkbox" id="fIg" onchange="applyFilters()"> Instagram</label>
+    <span id="count"></span>
+  </div>
+  <div id="tableWrap"><div class="loading">Yukleniyor...</div></div>
+</div>
+<script>
+let DATA=[];
+let sortCol=-1,sortDir='desc';
+
+async function load(){
+  try{
+    const r=await fetch('/api/leads');
+    DATA=await r.json();
+  }catch(e){
+    document.getElementById('tableWrap').innerHTML='<div class="loading">Veri yuklenemedi</div>';
+    return;
+  }
+
+  const cats=new Set(DATA.filter(d=>d.category).map(d=>d.category));
+  const sel=document.getElementById('catF');
+  [...cats].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
+
+  renderStats();
+  renderTable();
+}
+
+function renderStats(){
+  const t=DATA.length;
+  const ph=DATA.filter(d=>d.phones&&d.phones.length).length;
+  const wa=DATA.filter(d=>d.whatsapp).length;
+  const ig=DATA.filter(d=>d.instagram).length;
+  const em=DATA.filter(d=>d.emails&&d.emails.length).length;
+  document.getElementById('stats').innerHTML=
+    `<div class="stat"><div class="n">${t}</div><div class="l">Magaza</div></div>`+
+    `<div class="stat"><div class="n">${ph}</div><div class="l">Telefon</div></div>`+
+    `<div class="stat"><div class="n">${wa}</div><div class="l">WhatsApp</div></div>`+
+    `<div class="stat"><div class="n">${em}</div><div class="l">Email</div></div>`+
+    `<div class="stat"><div class="n">${ig}</div><div class="l">Instagram</div></div>`;
+}
+
+function renderTable(){
+  const filtered=getFiltered();
+  document.getElementById('count').textContent=`${filtered.length} / ${DATA.length}`;
+
+  const ths=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Urun']
+    .map((h,i)=>`<th onclick="doSort(${i})"${sortCol===i?' class="sorted"':''}>${h} <span class="arr">${sortCol===i?(sortDir==='asc'?'▲':'▼'):'▲'}</span></th>`).join('');
+
+  let rows='';
+  filtered.forEach((d,i)=>{
+    const phone=d.phones&&d.phones[0]||'';
+    const wa=d.whatsapp||'';
+    const email=(d.emails&&d.emails[0])||'';
+    const igUser=d.instagram?d.instagram.replace('https://instagram.com/','@'):'';
+    const igLink=d.instagram||'';
+    const igF=d.ig_followers||0;
+    const igDisp=igF?igF.toLocaleString('tr-TR'):'-';
+    const hp=phone||wa?'hp':'';
+    const cat=d.category||'';
+
+    rows+=`<tr class="${hp}">
+      <td>${i+1}</td>
+      <td class="nm">${d.store_name||d.domain||''}</td>
+      <td>${phone?`<a href="tel:${phone}">${phone}</a>`:'<span class="e">-</span>'}</td>
+      <td>${wa?`<a href="https://wa.me/${wa}" target="_blank">${wa}</a>`:'<span class="e">-</span>'}</td>
+      <td>${email?`<a href="mailto:${email}">${email}</a>`:'<span class="e">-</span>'}</td>
+      <td>${igUser?`<a href="${igLink}" target="_blank">${igUser}</a>`:'<span class="e">-</span>'}</td>
+      <td class="ig">${igDisp}</td>
+      <td><a href="${d.url}" target="_blank">Ac</a></td>
+      <td>${cat?`<span class="badge">${cat}</span>`:''}</td>
+      <td>${d.product_count||'-'}</td>
+    </tr>`;
+  });
+
+  document.getElementById('tableWrap').innerHTML=`<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function getFiltered(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const cat=document.getElementById('catF').value;
+  const fP=document.getElementById('fPhone').checked;
+  const fW=document.getElementById('fWa').checked;
+  const fI=document.getElementById('fIg').checked;
+
+  let arr=DATA.filter(d=>{
+    if(q){
+      const txt=`${d.store_name||''} ${d.domain||''} ${d.category||''} ${(d.emails||[]).join(' ')}`.toLowerCase();
+      if(!txt.includes(q))return false;
+    }
+    if(cat&&d.category!==cat)return false;
+    if(fP&&(!d.phones||!d.phones.length))return false;
+    if(fW&&!d.whatsapp)return false;
+    if(fI&&!d.instagram)return false;
+    return true;
+  });
+
+  if(sortCol>=0) arr=sortData(arr);
+  return arr;
+}
+
+function sortData(arr){
+  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','product_count'][sortCol];
+  if(!key)return arr;
+  return arr.slice().sort((a,b)=>{
+    let va=a[key]??'', vb=b[key]??'';
+    if(typeof va==='number'||key==='ig_followers'||key==='product_count'){
+      va=Number(va)||0; vb=Number(vb)||0;
+      return sortDir==='asc'?va-vb:vb-va;
+    }
+    va=String(va).toLowerCase(); vb=String(vb).toLowerCase();
+    return sortDir==='asc'?va.localeCompare(vb,'tr'):vb.localeCompare(va,'tr');
+  });
+}
+
+function doSort(col){
+  if(sortCol===col) sortDir=sortDir==='asc'?'desc':'asc';
+  else{sortCol=col;sortDir='desc';}
+  renderTable();
+}
+
+function applyFilters(){renderTable()}
+
+load();
+</script>
+</body>
+</html>
