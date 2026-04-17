@@ -2,10 +2,5 @@
   "version": 2,
   "rewrites": [
     { "source": "/", "destination": "/leads.html" }
-  ],
-  "crons": [
-    { "path": "/api/cron/discover",  "schedule": "0 6 * * *" },
-    { "path": "/api/cron/enrich",    "schedule": "0 8 * * *" },
-    { "path": "/api/cron/instagram", "schedule": "0 10 * * *" }
   ]
 }
