@@ -78,16 +78,9 @@ module.exports = async function handler(req, res) {
 
   const supabase = getSupabase();
 
-  // Hangi sayfada kaldığımızı DB'den oku
-  const { data: meta } = await supabase
-    .from('shopify_stores')
-    .select('id')
-    .limit(1);
-
-  // page_offset'i query param'dan al, yoksa 0'dan başla
-  const offset = parseInt(req.query.offset || '0') || 0;
-  const pages = ALL_PAGES.slice(offset, offset + PAGES_PER_RUN);
-  const nextOffset = offset + PAGES_PER_RUN >= ALL_PAGES.length ? 0 : offset + PAGES_PER_RUN;
+  // Her çağrıda rastgele 3 sayfa seç - zamanla hepsini tarar
+  const shuffled = [...ALL_PAGES].sort(() => Math.random() - 0.5);
+  const pages = shuffled.slice(0, PAGES_PER_RUN);
 
   const allUrls = new Set();
 
