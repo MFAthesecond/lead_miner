@@ -7,7 +7,7 @@
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;padding:20px}
-    .container{max-width:1500px;margin:0 auto}
+    .container{max-width:1600px;margin:0 auto}
     h1{font-size:24px;margin-bottom:4px}
     .subtitle{color:#666;margin-bottom:20px;font-size:13px}
     .stats{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
@@ -15,7 +15,7 @@
     .stat .n{font-size:26px;font-weight:700;color:#5b5ea6}
     .stat .l{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px}
     .filters{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .filters input[type=text]{padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:220px}
+    .filters input[type=text]{padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px}
     .filters select{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:#fff}
     .filters label{font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap}
     #count{margin-left:auto;color:#888;font-size:12px}
@@ -24,17 +24,25 @@
     th:hover{background:#4a4d95}
     th .arr{font-size:9px;margin-left:3px;opacity:.4}
     th.sorted .arr{opacity:1}
-    td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px}
+    td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle}
     tr:hover{background:#f8f9ff}
     tr.hp{background:#f0fff4}
     tr.hp:hover{background:#e6ffec}
-    .nm{font-weight:600;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .nm{font-weight:600;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     a{color:#5b5ea6;text-decoration:none}
     a:hover{text-decoration:underline}
     .e{color:#ccc}
-    .badge{background:#eef;color:#5b5ea6;padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap}
+    .badge{padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap}
+    .badge-cat{background:#eef;color:#5b5ea6}
     .ig{text-align:right;font-variant-numeric:tabular-nums}
     .loading{text-align:center;padding:60px;color:#888;font-size:16px}
+    .tag-select{padding:3px 6px;border:1px solid #ddd;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;width:100px}
+    .tag-select.t-arandi{background:#fff3cd;border-color:#ffc107}
+    .tag-select.t-ilgileniyor{background:#d1ecf1;border-color:#17a2b8}
+    .tag-select.t-teklif{background:#d4edda;border-color:#28a745}
+    .tag-select.t-musteri{background:#cce5ff;border-color:#007bff}
+    .tag-select.t-reddetti{background:#f8d7da;border-color:#dc3545}
+    .tag-select.t-sonra{background:#e2e3e5;border-color:#6c757d}
   </style>
 </head>
 <body>
@@ -45,6 +53,16 @@
   <div class="filters">
     <input type="text" id="search" placeholder="Magaza ara..." oninput="applyFilters()">
     <select id="catF" onchange="applyFilters()"><option value="">Tum Kategoriler</option></select>
+    <select id="tagF" onchange="applyFilters()">
+      <option value="">Tum Tagler</option>
+      <option value="Arandi">Arandi</option>
+      <option value="Ilgileniyor">Ilgileniyor</option>
+      <option value="Teklif Verildi">Teklif Verildi</option>
+      <option value="Musteri">Musteri</option>
+      <option value="Reddetti">Reddetti</option>
+      <option value="Sonra Ara">Sonra Ara</option>
+      <option value="_none">Tagsiz</option>
+    </select>
     <label><input type="checkbox" id="fPhone" onchange="applyFilters()"> Telefonlu</label>
     <label><input type="checkbox" id="fWa" onchange="applyFilters()"> WhatsApp</label>
     <label><input type="checkbox" id="fIg" onchange="applyFilters()"> Instagram</label>
@@ -56,6 +74,25 @@
 let DATA=[];
 let sortCol=-1,sortDir='desc';
 
+const TAG_OPTIONS = [
+  {value:'',label:'-'},
+  {value:'Arandi',label:'Arandi'},
+  {value:'Ilgileniyor',label:'Ilgileniyor'},
+  {value:'Teklif Verildi',label:'Teklif Verildi'},
+  {value:'Musteri',label:'Musteri'},
+  {value:'Reddetti',label:'Reddetti'},
+  {value:'Sonra Ara',label:'Sonra Ara'},
+];
+
+const TAG_CLASS = {
+  'Arandi':'t-arandi',
+  'Ilgileniyor':'t-ilgileniyor',
+  'Teklif Verildi':'t-teklif',
+  'Musteri':'t-musteri',
+  'Reddetti':'t-reddetti',
+  'Sonra Ara':'t-sonra',
+};
+
 async function load(){
   try{
     const r=await fetch('/api/leads');
@@ -64,11 +101,9 @@ async function load(){
     document.getElementById('tableWrap').innerHTML='<div class="loading">Veri yuklenemedi</div>';
     return;
   }
-
   const cats=new Set(DATA.filter(d=>d.category).map(d=>d.category));
   const sel=document.getElementById('catF');
   [...cats].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
-
   renderStats();
   renderTable();
 }
@@ -79,20 +114,48 @@ function renderStats(){
   const wa=DATA.filter(d=>d.whatsapp).length;
   const ig=DATA.filter(d=>d.instagram).length;
   const em=DATA.filter(d=>d.emails&&d.emails.length).length;
+  const tagged=DATA.filter(d=>d.tag).length;
   document.getElementById('stats').innerHTML=
     `<div class="stat"><div class="n">${t}</div><div class="l">Magaza</div></div>`+
     `<div class="stat"><div class="n">${ph}</div><div class="l">Telefon</div></div>`+
     `<div class="stat"><div class="n">${wa}</div><div class="l">WhatsApp</div></div>`+
     `<div class="stat"><div class="n">${em}</div><div class="l">Email</div></div>`+
-    `<div class="stat"><div class="n">${ig}</div><div class="l">Instagram</div></div>`;
+    `<div class="stat"><div class="n">${ig}</div><div class="l">Instagram</div></div>`+
+    `<div class="stat"><div class="n">${tagged}</div><div class="l">Taglenmis</div></div>`;
+}
+
+function tagSelect(d){
+  const cls = TAG_CLASS[d.tag]||'';
+  const opts = TAG_OPTIONS.map(o =>
+    `<option value="${o.value}"${d.tag===o.value?' selected':''}>${o.label}</option>`
+  ).join('');
+  return `<select class="tag-select ${cls}" onchange="setTag(${d.id},this.value,this)">${opts}</select>`;
+}
+
+async function setTag(id, tag, el){
+  el.disabled=true;
+  try{
+    await fetch('/api/leads',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id, tag: tag||null})
+    });
+    const item=DATA.find(d=>d.id===id);
+    if(item) item.tag=tag||null;
+    el.className='tag-select '+(TAG_CLASS[tag]||'');
+    renderStats();
+  }catch(e){
+    alert('Hata: '+e.message);
+  }
+  el.disabled=false;
 }
 
 function renderTable(){
   const filtered=getFiltered();
   document.getElementById('count').textContent=`${filtered.length} / ${DATA.length}`;
 
-  const ths=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Urun']
-    .map((h,i)=>`<th onclick="doSort(${i})"${sortCol===i?' class="sorted"':''}>${h} <span class="arr">${sortCol===i?(sortDir==='asc'?'▲':'▼'):'▲'}</span></th>`).join('');
+  const cols=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Tag','Urun'];
+  const ths=cols.map((h,i)=>`<th onclick="doSort(${i})"${sortCol===i?' class="sorted"':''}>${h} <span class="arr">${sortCol===i?(sortDir==='asc'?'\u25B2':'\u25BC'):'\u25B2'}</span></th>`).join('');
 
   let rows='';
   filtered.forEach((d,i)=>{
@@ -115,7 +178,8 @@ function renderTable(){
       <td>${igUser?`<a href="${igLink}" target="_blank">${igUser}</a>`:'<span class="e">-</span>'}</td>
       <td class="ig">${igDisp}</td>
       <td><a href="${d.url}" target="_blank">Ac</a></td>
-      <td>${cat?`<span class="badge">${cat}</span>`:''}</td>
+      <td>${cat?`<span class="badge badge-cat">${cat}</span>`:''}</td>
+      <td>${tagSelect(d)}</td>
       <td>${d.product_count||'-'}</td>
     </tr>`;
   });
@@ -126,16 +190,19 @@ function renderTable(){
 function getFiltered(){
   const q=document.getElementById('search').value.toLowerCase();
   const cat=document.getElementById('catF').value;
+  const tagFilter=document.getElementById('tagF').value;
   const fP=document.getElementById('fPhone').checked;
   const fW=document.getElementById('fWa').checked;
   const fI=document.getElementById('fIg').checked;
 
   let arr=DATA.filter(d=>{
     if(q){
-      const txt=`${d.store_name||''} ${d.domain||''} ${d.category||''} ${(d.emails||[]).join(' ')}`.toLowerCase();
+      const txt=`${d.store_name||''} ${d.domain||''} ${d.category||''} ${(d.emails||[]).join(' ')} ${d.tag||''}`.toLowerCase();
       if(!txt.includes(q))return false;
     }
     if(cat&&d.category!==cat)return false;
+    if(tagFilter==='_none'&&d.tag)return false;
+    if(tagFilter&&tagFilter!=='_none'&&d.tag!==tagFilter)return false;
     if(fP&&(!d.phones||!d.phones.length))return false;
     if(fW&&!d.whatsapp)return false;
     if(fI&&!d.instagram)return false;
@@ -147,7 +214,7 @@ function getFiltered(){
 }
 
 function sortData(arr){
-  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','product_count'][sortCol];
+  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','tag','product_count'][sortCol];
   if(!key)return arr;
   return arr.slice().sort((a,b)=>{
     let va=a[key]??'', vb=b[key]??'';

@@ -29,4 +29,6 @@ CREATE INDEX IF NOT EXISTS idx_stores_enriched ON shopify_stores (enriched_at)
 CREATE INDEX IF NOT EXISTS idx_stores_ig ON shopify_stores (ig_fetched_at)
   WHERE instagram IS NOT NULL AND ig_fetched_at IS NULL;
 
+ALTER TABLE shopify_stores ADD COLUMN IF NOT EXISTS tag text;
+
 ALTER TABLE shopify_stores DISABLE ROW LEVEL SECURITY;
