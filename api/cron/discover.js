@@ -399,6 +399,54 @@ async function isShopifyDomain(domain) {
   } catch { return false; }
 }
 
+const TR_BRAND_WORDS = [
+  'aksesuar','alin','ankara','antep','antalya','atelier','atolye',
+  'ayakkabi','bahar','bahce','bal','bebek','beyaz','boncuk','butik',
+  'cafe','canim','canta','cicek','cocuk','concept','cuzdan',
+  'deco','dekor','deri','design','dijital','dogal','doga','dukkan',
+  'el','elbise','elit','emir','erdem','erzurum',
+  'fashion','fit','flora',
+  'giyim','gold','gumus','gurme','guzel','guzellik',
+  'hali','hamam','hanim','hayat','hediye','home','house',
+  'istanbul','izmir',
+  'kahve','kedi','kilim','konak','kozmetik','kraft','kutu',
+  'leziz','lokum','lux','luxury',
+  'marka','market','mercan','moda','mobilya','mutfak',
+  'naturel','nazar','nur',
+  'olive','organic','organik','ottoman','ozel',
+  'pasha','peri','premier','premium',
+  'rose','ruh',
+  'sanat','sapka','sari','seker','sepet','shop','silver','sofra','stil','store','sultan',
+  'taki','tasarim','tekne','tekstil','toptan','trend','turk','turkish',
+  'vintage',
+  'yesil','yildiz','yore','yoresel',
+  'zehra','zeytin','zen',
+];
+
+async function bruteForceMyshopify() {
+  const domains = new Set();
+  const shuffled = [...TR_BRAND_WORDS].sort(() => Math.random() - 0.5).slice(0, 10);
+
+  const checks = await Promise.all(shuffled.map(async (word) => {
+    const host = `${word}.myshopify.com`;
+    try {
+      const resp = await fetch(`https://${host}/products.json?limit=1`, {
+        headers: { 'User-Agent': UA },
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!resp.ok) return null;
+      const text = await resp.text();
+      if (text.includes('"products"')) return `https://${host}`;
+    } catch {}
+    return null;
+  }));
+
+  for (const url of checks) {
+    if (url && !isBigBrand(url)) domains.add(url);
+  }
+  return domains;
+}
+
 async function discoverComTr() {
   const domains = new Set();
   const keyword = COMTR_KEYWORDS[Math.floor(Math.random() * COMTR_KEYWORDS.length)];
@@ -455,8 +503,9 @@ module.exports = async function handler(req, res) {
   const ddgPs = shuffledDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
   const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
   const comTrP = discoverComTr().then(s => [...s]).catch(() => []);
+  const bruteP = bruteForceMyshopify().then(s => [...s]).catch(() => []);
 
-  const results = await Promise.all([...pagePs, ...ddgPs, crtP, comTrP]);
+  const results = await Promise.all([...pagePs, ...ddgPs, crtP, comTrP, bruteP]);
   for (const domains of results) {
     for (const d of domains) allUrls.add(d);
   }

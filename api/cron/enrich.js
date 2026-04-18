@@ -321,6 +321,13 @@ async function enrichOne(url) {
   };
 }
 
+const SNOWBALL_PATHS = [
+  '', '/pages/markalar', '/pages/bayiler', '/pages/brands',
+  '/pages/is-ortaklarimiz', '/pages/hakkimizda', '/pages/about',
+  '/collections', '/blogs/news',
+];
+const SNOWBALL_BATCH = 8;
+
 async function snowballExisting(supabase) {
   const { count } = await supabase
     .from('shopify_stores')
@@ -329,33 +336,42 @@ async function snowballExisting(supabase) {
     .not('enriched_at', 'is', null);
 
   const total = count || 0;
-  const offset = total > 3 ? Math.floor(Math.random() * (total - 3)) : 0;
-  const { data: stores } = await supabase
+  if (total === 0) return { snowball_scanned: 0, snowball_discovered: 0 };
+  const offset = Math.floor(Math.random() * total);
+  let { data: stores } = await supabase
     .from('shopify_stores')
     .select('id, url')
     .eq('is_shopify', true)
     .not('enriched_at', 'is', null)
-    .range(offset, offset + 2);
+    .range(offset, offset + SNOWBALL_BATCH - 1);
 
   if (!stores || stores.length === 0) return { snowball_scanned: 0, snowball_discovered: 0 };
 
   let discovered = 0;
-  for (const store of stores) {
+  const allLinks = new Set();
+
+  await Promise.all(stores.map(async (store) => {
     try {
-      const html = await fetchPage(store.url);
-      if (!html) continue;
       let ownHost = '';
       try { ownHost = new URL(store.url).hostname.toLowerCase().replace(/^www\./, ''); } catch {}
+
+      const subPath = SNOWBALL_PATHS[Math.floor(Math.random() * SNOWBALL_PATHS.length)];
+      const pageUrl = subPath ? new URL(subPath, store.url).href : store.url;
+
+      const html = await fetchPage(pageUrl);
+      if (!html) return;
       const links = extractOutboundStores(html, ownHost);
-      if (links.length) {
-        const newRows = links.map(u => ({ url: u, domain: domainFromUrl(u) }));
-        const { data: inserted } = await supabase
-          .from('shopify_stores')
-          .upsert(newRows, { onConflict: 'url', ignoreDuplicates: true })
-          .select('id');
-        discovered += (inserted || []).length;
-      }
+      for (const l of links) allLinks.add(l);
     } catch {}
+  }));
+
+  if (allLinks.size) {
+    const newRows = [...allLinks].map(u => ({ url: u, domain: domainFromUrl(u) }));
+    const { data: inserted } = await supabase
+      .from('shopify_stores')
+      .upsert(newRows, { onConflict: 'url', ignoreDuplicates: true })
+      .select('id');
+    discovered = (inserted || []).length;
   }
   return { snowball_scanned: stores.length, snowball_discovered: discovered };
 }
