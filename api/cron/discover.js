@@ -337,40 +337,80 @@ const DDG_SKIP_HOSTS = new Set([
   'ideasoft.com.tr','www.ideasoft.com.tr',
 ]);
 
-async function searchDDG(query) {
+const DDG_OFFSETS = [0, 30, 60, 90];
+
+function extractDomainsFromDDG(html) {
+  const $ = cheerio.load(html);
   const domains = new Set();
+  const nextFormData = {};
+
+  $('a.result__a').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    const decoded = decodeURIComponent(href);
+    const m = decoded.match(/uddg=(https?[^&]+)/);
+    if (!m) return;
+    try {
+      const u = new URL(m[1]);
+      const host = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (DDG_SKIP_HOSTS.has(host) || DDG_SKIP_HOSTS.has('www.' + host)) return;
+      if (host.includes('google.') || host.includes('facebook.')) return;
+
+      const dots = host.split('.').length;
+      const isEcommerce = host.endsWith('.com.tr') || host.endsWith('.com') ||
+        host.endsWith('.shop') || host.endsWith('.store') ||
+        host.includes('myshopify.com');
+      if (isEcommerce && dots <= 3) {
+        const d = 'https://' + host;
+        if (!isBigBrand(d)) domains.add(d);
+      }
+    } catch {}
+  });
+
+  $('input[type="hidden"]').each((_, el) => {
+    const name = $(el).attr('name');
+    const val = $(el).attr('value');
+    if (name && val !== undefined) nextFormData[name] = val;
+  });
+
+  return { domains, nextFormData };
+}
+
+async function searchDDG(query) {
+  const allDomains = new Set();
   try {
     const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
     const resp = await fetch(url, {
       headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(4000),
     });
-    if (!resp.ok) return domains;
+    if (!resp.ok) return allDomains;
     const html = await resp.text();
-    const $ = cheerio.load(html);
-    $('a.result__a').each((_, el) => {
-      const href = $(el).attr('href') || '';
-      const decoded = decodeURIComponent(href);
-      const m = decoded.match(/uddg=(https?[^&]+)/);
-      if (!m) return;
-      try {
-        const u = new URL(m[1]);
-        const host = u.hostname.toLowerCase().replace(/^www\./, '');
-        if (DDG_SKIP_HOSTS.has(host) || DDG_SKIP_HOSTS.has('www.' + host)) return;
-        if (host.includes('google.') || host.includes('facebook.')) return;
+    const { domains, nextFormData } = extractDomainsFromDDG(html);
+    for (const d of domains) allDomains.add(d);
 
-        const dots = host.split('.').length;
-        const isEcommerce = host.endsWith('.com.tr') || host.endsWith('.com') ||
-          host.endsWith('.shop') || host.endsWith('.store') ||
-          host.includes('myshopify.com');
-        if (isEcommerce && dots <= 3) {
-          const d = 'https://' + host;
-          if (!isBigBrand(d)) domains.add(d);
+    if (nextFormData.q && nextFormData.s) {
+      try {
+        const formBody = Object.entries(nextFormData)
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+          .join('&');
+        const resp2 = await fetch('https://html.duckduckgo.com/html/', {
+          method: 'POST',
+          headers: {
+            'User-Agent': UA,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: formBody,
+          signal: AbortSignal.timeout(4000),
+        });
+        if (resp2.ok) {
+          const html2 = await resp2.text();
+          const { domains: d2 } = extractDomainsFromDDG(html2);
+          for (const d of d2) allDomains.add(d);
         }
       } catch {}
-    });
+    }
   } catch {}
-  return domains;
+  return allDomains;
 }
 
 async function searchCrtSh() {
