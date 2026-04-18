@@ -150,96 +150,84 @@ const ALL_PAGES = [
 ];
 
 const DDG_QUERIES = [
-  // Kanitlanmis calisan kaliplar (niche + turkiye)
-  'myshopify.com kozmetik türkiye',
-  'myshopify.com spor giyim türkiye',
-  'myshopify.com takı aksesuar istanbul',
-  'myshopify.com kahve türk',
-  'myshopify.com organik doğal türkiye',
-  'myshopify.com giyim moda türkiye',
-  'myshopify.com ev dekorasyon türkiye',
-  'myshopify.com bebek çocuk türkiye',
-  'myshopify.com ayakkabı çanta türkiye',
-  'myshopify.com pet evcil hayvan türkiye',
-  'myshopify.com mobilya türkiye',
-  'myshopify.com halı kilim türkiye',
-  'myshopify.com türk çikolata',
-  'myshopify.com gelinlik türkiye',
-  'myshopify.com perde türkiye',
-  'myshopify.com parfüm türkiye',
-  'myshopify.com oyuncak türkiye',
-  'myshopify.com bahçe türkiye',
-  'myshopify.com örgü tığ türkiye',
-  'myshopify.com deri cüzdan türkiye',
-  'myshopify.com çay baklava türkiye',
-  'myshopify.com balık deniz türkiye',
-  '"Powered by Shopify" "com.tr" giyim',
-  '"Powered by Shopify" "com.tr" kozmetik',
+  // === GENEL TURK E-TICARET ARAMALARI (Shopify'dan bahsetmeden) ===
+  // Giyim / Moda
+  'online giyim mağazası türkiye',
+  'kadın giyim online mağaza istanbul',
+  'erkek giyim online sipariş türkiye',
+  'tesettür giyim online mağaza',
+  'çocuk giyim online alışveriş',
+  'streetwear türkiye online',
+  'spor giyim online mağaza türkiye',
+  'gelinlik online satış türkiye',
+  'iç giyim pijama online türkiye',
+  // Aksesuar / Takı / Deri
+  'takı aksesuar online mağaza türkiye',
+  'el yapımı takı online satış',
+  'deri çanta cüzdan online türkiye',
+  'gümüş takı online mağaza',
+  'saat online satış türkiye',
+  'gözlük online mağaza türkiye',
+  'ayakkabı online sipariş türkiye',
+  // Kozmetik / Güzellik
+  'kozmetik online mağaza türkiye',
+  'doğal kozmetik online satış',
+  'cilt bakım ürünleri online türkiye',
+  'parfüm online mağaza türkiye',
+  'saç bakım online sipariş',
+  'organik güzellik ürünleri türkiye',
+  // Ev / Dekorasyon / Mobilya
+  'ev dekorasyon online mağaza türkiye',
+  'mobilya online sipariş türkiye',
+  'halı kilim online satış',
+  'aydınlatma dekorasyon online türkiye',
+  'mutfak gereçleri online sipariş',
+  'ev tekstili online mağaza türkiye',
+  'bahçe ürünleri online satış',
+  // Gıda / Gurme
+  'gurme gıda online sipariş türkiye',
+  'organik gıda online mağaza',
+  'türk kahvesi online satış',
+  'çay baklava online sipariş',
+  'zeytinyağı bal online mağaza türkiye',
+  'lokum şekerleme online satış',
+  'özel gıda online mağaza istanbul',
+  // Bebek / Çocuk / Pet
+  'bebek ürünleri online mağaza türkiye',
+  'oyuncak online sipariş türkiye',
+  'evcil hayvan ürünleri online mağaza',
+  'kedi köpek online mağaza türkiye',
+  // Spor / Outdoor
+  'spor malzemesi online satış türkiye',
+  'outdoor kamp online mağaza',
+  'bisiklet online sipariş türkiye',
+  'fitness ürünleri online türkiye',
+  // Elektronik / Teknoloji
+  'telefon aksesuar online mağaza türkiye',
+  'elektronik aksesuar online satış',
+  // Hobi / El yapımı / Sanat
+  'el yapımı ürünler online mağaza türkiye',
+  'hobi malzemesi online sipariş',
+  'seramik online satış türkiye',
+  'boncuk tığ örgü online mağaza',
+  'sanat malzemesi online türkiye',
+  // Genel alışveriş kalıpları
+  '"online mağaza" "₺" istanbul',
+  '"online mağaza" "₺" ankara',
+  '"online mağaza" "₺" izmir',
+  '"sepete ekle" "₺" türkiye',
+  '"sepete ekle" "kargo" türk mağaza',
+  '"kapıda ödeme" online mağaza',
+  '"havale" "EFT" online mağaza türkiye',
+  '"ücretsiz kargo" online mağaza türkiye',
+  '"hızlı teslimat" online mağaza',
+  '"online satış" türkiye yeni mağaza 2025',
+  '"online satış" türkiye yeni mağaza 2026',
+  // Powered by Shopify (hala faydali)
   '"Powered by Shopify" "₺"',
-  // Mikro nişler
-  'myshopify.com mum kokulu türkiye',
-  'myshopify.com seramik el yapımı türkiye',
-  'myshopify.com ahşap dekorasyon türkiye',
-  'myshopify.com kumaş türkiye',
-  'myshopify.com çanta deri istanbul',
-  'myshopify.com saat aksesuar türkiye',
-  'myshopify.com yoga pilates türkiye',
-  'myshopify.com bisiklet türkiye',
-  'myshopify.com kamp outdoor türkiye',
-  'myshopify.com kitap kırtasiye türkiye',
-  'myshopify.com çiçek yapay türkiye',
-  'myshopify.com puzzle hobi türkiye',
-  'myshopify.com vitamin takviye türkiye',
-  'myshopify.com mayo bikini türkiye',
-  'myshopify.com gözlük güneş türkiye',
-  'myshopify.com tesettür türkiye',
-  'myshopify.com streetwear türkiye',
-  'myshopify.com eşarp türkiye',
-  'myshopify.com çorap iç giyim türkiye',
-  'myshopify.com süs akvaryum türkiye',
-  'myshopify.com zeytinyağı bal türkiye',
-  'myshopify.com lokum şekerleme türkiye',
-  'myshopify.com elektronik aksesuar türkiye',
-  'myshopify.com telefon kılıf türkiye',
-  'myshopify.com hediye hediyelik türkiye',
-  'myshopify.com düğün nikah türkiye',
-  'myshopify.com oto aksesuar türkiye',
-  'myshopify.com sanat tablo türkiye',
-  'myshopify.com müzik enstrüman türkiye',
-  'myshopify.com promosyon baskı türkiye',
-  'myshopify.com ambalaj paketleme türkiye',
-  'myshopify.com temizlik hijyen türkiye',
-  'myshopify.com aydınlatma lamba türkiye',
-  'myshopify.com mutfak gereçleri türkiye',
-  'myshopify.com havlu bornoz türkiye',
-  // .com.tr kaliplari
-  '"Powered by Shopify" site:.com.tr',
-  'shopify mağaza "com.tr" 2026',
-  'shopify "com.tr" online mağaza',
-  // Ajans / referans / vaka calismasi kaliplari
-  '"shopify" "referanslarımız" "com.tr"',
-  '"shopify" "başarı hikayesi" türkiye',
-  '"shopify ajansı" türkiye referans',
-  '"shopify uzmanı" "com.tr" portfolio',
-  '"shopify ile yaptık" "com.tr"',
-  '"shopify mağaza" "com.tr" açtık',
-  // Shopify footer + Turk icerik
-  '"Powered by Shopify" "kargo" "₺"',
-  '"Powered by Shopify" "kapıda ödeme"',
-  '"Powered by Shopify" "havale" "EFT"',
+  '"Powered by Shopify" "kargo" türkiye',
   '"Powered by Shopify" "sepete ekle"',
-  '"Powered by Shopify" istanbul mağaza',
-  '"Powered by Shopify" ankara mağaza',
-  '"Powered by Shopify" izmir mağaza',
-  // Instagram baglantili
-  '"myshopify.com" "instagram.com" türk',
-  'site:instagram.com "myshopify.com" türkiye',
-  'site:instagram.com "shopify" "com.tr"',
-  // Yeni e-ticaret trend kaliplari
-  'shopify türkiye "2025"',
-  'shopify türkiye "2026"',
-  '"shopify" "e-ticaret" "com.tr" yeni',
-  'shopify mağaza "TL" online alışveriş',
+  '"Powered by Shopify" site:.com.tr',
 ];
 
 const PAGES_PER_RUN = 2;
@@ -318,13 +306,18 @@ const DDG_SKIP_HOSTS = new Set([
   'webrazzi.com','www.webrazzi.com',
   'cloudflare.com','vercel.app','netlify.app','herokuapp.com',
   'apple.com','play.google.com','apps.apple.com',
+  'sikayetvar.com','www.sikayetvar.com','eksisozluk.com',
+  'donanimhaber.com','www.donanimhaber.com',
+  'hurriyet.com.tr','milliyet.com.tr','sabah.com.tr',
+  'haberturk.com','ntv.com.tr','cnnturk.com',
+  'gittigidiyor.com','www.gittigidiyor.com',
+  'akakce.com','www.akakce.com','cimri.com','www.cimri.com',
+  'ikas.com','www.ikas.com','ticimax.com','www.ticimax.com',
+  'ideasoft.com.tr','www.ideasoft.com.tr',
 ]);
 
 async function searchDDG(query) {
   const domains = new Set();
-  const isShopifyFooterQuery = query.includes('Powered by Shopify') ||
-    query.includes('sepete ekle') || query.includes('kapıda ödeme') ||
-    query.includes('havale') || query.includes('₺');
   try {
     const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
     const resp = await fetch(url, {
@@ -345,10 +338,11 @@ async function searchDDG(query) {
         if (DDG_SKIP_HOSTS.has(host) || DDG_SKIP_HOSTS.has('www.' + host)) return;
         if (host.includes('google.') || host.includes('facebook.')) return;
 
-        if (host.includes('myshopify.com') || host.endsWith('.com.tr')) {
-          const d = 'https://' + host;
-          if (!isBigBrand(d)) domains.add(d);
-        } else if (isShopifyFooterQuery && host.endsWith('.com') && !host.includes('.com.')) {
+        const dots = host.split('.').length;
+        const isEcommerce = host.endsWith('.com.tr') || host.endsWith('.com') ||
+          host.endsWith('.shop') || host.endsWith('.store') ||
+          host.includes('myshopify.com');
+        if (isEcommerce && dots <= 3) {
           const d = 'https://' + host;
           if (!isBigBrand(d)) domains.add(d);
         }
