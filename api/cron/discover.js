@@ -139,15 +139,14 @@ const ALL_PAGES = [
   'https://storeleads.app/reports/shopify/TR/technology/Google%20Tag%20Manager',
   'https://storeleads.app/reports/shopify/TR/technology/Hotjar',
   'https://storeleads.app/reports/shopify/TR/technology/TikTok%20Pixel',
-  // Diger kaynaklar
-  'https://www.cartinsight.io/shopify-stores-in-turkey/',
-  'https://www.skailama.com/shopify-stores/turkey',
-  'https://www.aftership.com/store-list/top-100-tr-shopify-stores',
+  // Turk Shopify ajans portfoyleri ve rehberler
+  'https://www.shopifyuzmani.com.tr/projeler/',
+  'https://digitalexchange.com.tr/shopify-e-ticaret-site-kurulum/',
+  'https://eticaret.pro/shopify-ile-eticaret/',
+  'https://webrazzi.com/kategori/e-ticaret/',
+  // Hala calisan diger kaynaklar
   'https://analyzify.com/shopify-stores/l/turkey',
-  'https://ecommercedb.com/ranking/shopify/tr',
-  'https://www.shopistores.com/turkey/',
-  'https://trends.builtwith.com/shop/Shopify/Turkey',
-  'https://www.similartech.com/technologies/shopify/market/turkey',
+  'https://www.skailama.com/shopify-stores/turkey',
 ];
 
 const DDG_QUERIES = [
@@ -217,6 +216,30 @@ const DDG_QUERIES = [
   '"Powered by Shopify" site:.com.tr',
   'shopify mağaza "com.tr" 2026',
   'shopify "com.tr" online mağaza',
+  // Ajans / referans / vaka calismasi kaliplari
+  '"shopify" "referanslarımız" "com.tr"',
+  '"shopify" "başarı hikayesi" türkiye',
+  '"shopify ajansı" türkiye referans',
+  '"shopify uzmanı" "com.tr" portfolio',
+  '"shopify ile yaptık" "com.tr"',
+  '"shopify mağaza" "com.tr" açtık',
+  // Shopify footer + Turk icerik
+  '"Powered by Shopify" "kargo" "₺"',
+  '"Powered by Shopify" "kapıda ödeme"',
+  '"Powered by Shopify" "havale" "EFT"',
+  '"Powered by Shopify" "sepete ekle"',
+  '"Powered by Shopify" istanbul mağaza',
+  '"Powered by Shopify" ankara mağaza',
+  '"Powered by Shopify" izmir mağaza',
+  // Instagram baglantili
+  '"myshopify.com" "instagram.com" türk',
+  'site:instagram.com "myshopify.com" türkiye',
+  'site:instagram.com "shopify" "com.tr"',
+  // Yeni e-ticaret trend kaliplari
+  'shopify türkiye "2025"',
+  'shopify türkiye "2026"',
+  '"shopify" "e-ticaret" "com.tr" yeni',
+  'shopify mağaza "TL" online alışveriş',
 ];
 
 const PAGES_PER_RUN = 2;
@@ -258,6 +281,19 @@ function extractDomains(html, isSkailama) {
       const d = text.startsWith('http') ? text : `https://${text}`;
       if (!isBigBrand(d)) domains.add(d);
     }
+
+    const href = $(el).attr('href') || '';
+    if (!href.startsWith('http')) return;
+    try {
+      const u = new URL(href);
+      const host = u.hostname.toLowerCase();
+      if (host.endsWith('.myshopify.com') || host.endsWith('.com.tr')) {
+        if (!host.includes('storeleads') && !host.includes('shopify.com')
+            && !host.includes('google') && !isBigBrand('https://' + host)) {
+          domains.add('https://' + host);
+        }
+      }
+    } catch {}
   });
 
   return domains;
@@ -302,7 +338,6 @@ async function searchCrtSh() {
     );
     if (!resp.ok) return domains;
     const data = await resp.json();
-    // Rastgele 50 tanesini sec (her cagri farkli batch)
     const valid = data
       .map(c => (c?.common_name || '').toLowerCase())
       .filter(n => n.endsWith('.myshopify.com') && !n.startsWith('*') && n.length < 60);
@@ -311,6 +346,56 @@ async function searchCrtSh() {
       if (!isBigBrand(`https://${name}`)) {
         domains.add(`https://${name}`);
       }
+    }
+  } catch {}
+  return domains;
+}
+
+const COMTR_KEYWORDS = [
+  'shop','store','magaza','butik','market','outlet','online',
+  'moda','giyim','kozmetik','deri','taki','spor','gurme',
+  'kahve','ev','mobilya','bebek','pet','organik','dogal',
+];
+
+async function isShopifyDomain(domain) {
+  try {
+    const resp = await fetch(`https://${domain}/products.json?limit=1`, {
+      headers: { 'User-Agent': UA },
+      signal: AbortSignal.timeout(3000),
+      redirect: 'follow',
+    });
+    if (!resp.ok) return false;
+    const text = await resp.text();
+    return text.includes('"products"') && text.includes('cdn.shopify.com');
+  } catch { return false; }
+}
+
+async function discoverComTr() {
+  const domains = new Set();
+  const keyword = COMTR_KEYWORDS[Math.floor(Math.random() * COMTR_KEYWORDS.length)];
+  try {
+    const resp = await fetch(
+      `https://crt.sh/?q=%25${keyword}%25.com.tr&output=json&limit=100`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (!resp.ok) return domains;
+    const data = await resp.json();
+    const hosts = [...new Set(
+      data
+        .map(c => (c?.common_name || '').toLowerCase().replace(/^\*\./, '').replace(/^www\./, ''))
+        .filter(n => n.endsWith('.com.tr') && n.length < 50 && !n.includes('*'))
+    )];
+    const shuffled = hosts.sort(() => Math.random() - 0.5).slice(0, 5);
+
+    const checks = await Promise.all(
+      shuffled.map(async (host) => {
+        if (isBigBrand(`https://${host}`)) return null;
+        const isShopify = await isShopifyDomain(host);
+        return isShopify ? `https://${host}` : null;
+      })
+    );
+    for (const url of checks) {
+      if (url) domains.add(url);
     }
   } catch {}
   return domains;
@@ -340,8 +425,9 @@ module.exports = async function handler(req, res) {
 
   const ddgPs = shuffledDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
   const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
+  const comTrP = discoverComTr().then(s => [...s]).catch(() => []);
 
-  const results = await Promise.all([...pagePs, ...ddgPs, crtP]);
+  const results = await Promise.all([...pagePs, ...ddgPs, crtP, comTrP]);
   for (const domains of results) {
     for (const d of domains) allUrls.add(d);
   }

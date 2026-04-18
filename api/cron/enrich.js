@@ -1,4 +1,4 @@
-const { getSupabase, verifyCron, UA } = require('../_lib/supabase');
+const { getSupabase, verifyCron, UA, isBigBrand, domainFromUrl } = require('../_lib/supabase');
 
 const JUNK_EMAIL_DOMAINS = new Set([
   'sentry.io','sentry-next.wixpress.com','sentry.wixpress.com',
@@ -162,6 +162,50 @@ async function searchInstagramDDG(storeName) {
   } catch { return null; }
 }
 
+const SKIP_HOSTS = new Set([
+  'instagram.com','www.instagram.com','facebook.com','www.facebook.com',
+  'twitter.com','x.com','tiktok.com','www.tiktok.com',
+  'youtube.com','www.youtube.com','linkedin.com','www.linkedin.com',
+  'pinterest.com','www.pinterest.com','wa.me','api.whatsapp.com',
+  'google.com','www.google.com','apple.com','play.google.com',
+  'apps.apple.com','shopify.com','www.shopify.com','apps.shopify.com',
+  'cdn.shopify.com','trendyol.com','www.trendyol.com',
+  'hepsiburada.com','www.hepsiburada.com','n11.com','www.n11.com',
+  'amazon.com','www.amazon.com','amazon.com.tr','www.amazon.com.tr',
+  'etsy.com','www.etsy.com','aliexpress.com',
+  'wordpress.com','blogger.com','medium.com','github.com',
+  'cloudflare.com','vercel.app','netlify.app','herokuapp.com',
+]);
+
+function extractOutboundStores(html, ownHost) {
+  const cheerio = require('cheerio');
+  const $ = cheerio.load(html);
+  const found = new Set();
+
+  $('a[href]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    if (!href.startsWith('http')) return;
+    try {
+      const u = new URL(href);
+      const host = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (host === ownHost) return;
+      if (SKIP_HOSTS.has(host) || SKIP_HOSTS.has('www.' + host)) return;
+      if (host.includes('google.') || host.includes('facebook.') || host.includes('apple.')) return;
+      if (isBigBrand('https://' + host)) return;
+
+      const isShopifyDomain = host.endsWith('.myshopify.com');
+      const isTrDomain = host.endsWith('.com.tr') || host.endsWith('.tr');
+      const isComDomain = host.endsWith('.com') && !host.includes('.');
+
+      if (isShopifyDomain || isTrDomain) {
+        found.add('https://' + host);
+      }
+    } catch {}
+  });
+
+  return [...found];
+}
+
 function guessCategory(name, desc) {
   const text = `${name} ${desc}`.toLowerCase();
   const cats = {
@@ -253,6 +297,10 @@ async function enrichOne(url) {
     } catch {}
   }
 
+  let ownHost = '';
+  try { ownHost = new URL(url).hostname.toLowerCase().replace(/^www\./, ''); } catch {}
+  const snowballLinks = extractOutboundStores(allHtml, ownHost);
+
   return {
     store_name: title || null,
     emails: extractEmails(allHtml),
@@ -268,6 +316,7 @@ async function enrichOne(url) {
     product_count: productsData ? (productsData.products || []).length : null,
     description,
     is_shopify: isShopify,
+    _snowball: snowballLinks,
   };
 }
 
@@ -285,6 +334,7 @@ module.exports = async function handler(req, res) {
   if (error) return res.status(500).json({ error: error.message });
   if (!rows || rows.length === 0) return res.json({ ok: true, enriched: 0, message: 'Nothing to enrich' });
 
+  let snowballTotal = 0;
   const results = await Promise.all(rows.map(async (row) => {
     const data = await enrichOne(row.url);
     if (data.error) {
@@ -293,11 +343,27 @@ module.exports = async function handler(req, res) {
         .eq('id', row.id);
       return false;
     }
+    const snowball = data._snowball || [];
+    delete data._snowball;
     await supabase.from('shopify_stores')
       .update({ ...data, enriched_at: new Date().toISOString() })
       .eq('id', row.id);
+
+    if (snowball.length) {
+      const newRows = snowball.map(u => ({ url: u, domain: domainFromUrl(u) }));
+      const { data: inserted } = await supabase
+        .from('shopify_stores')
+        .upsert(newRows, { onConflict: 'url', ignoreDuplicates: true })
+        .select('id');
+      snowballTotal += (inserted || []).length;
+    }
     return true;
   }));
 
-  return res.json({ ok: true, enriched: results.filter(Boolean).length, total: rows.length });
+  return res.json({
+    ok: true,
+    enriched: results.filter(Boolean).length,
+    total: rows.length,
+    snowball_discovered: snowballTotal,
+  });
 };

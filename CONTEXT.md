@@ -23,12 +23,12 @@ lead_miner/
   api/
     _lib/supabase.js        # Shared: Supabase client, CRON_SECRET, BIG_BRANDS filtresi, isBigBrand(), domainFromUrl()
     cron/
-      discover.js            # Yeni mağaza bulma - 73 Store Leads sayfası + 20 DuckDuckGo sorgusu, rastgele rotasyon, her çağrıda 3 sayfa VEYA 1 DDG sorgusu
-      enrich.js              # İletişim bilgisi çekme - enriched_at IS NULL olanlardan 2'şer batch, site HTML'den email/tel/insta/whatsapp parse
-      instagram.js           # Takipçi sayısı çekme - i.instagram.com API, 5'er batch, rate limit aware
-    leads.js                 # GET: filtreli JSON API (phone/whatsapp/instagram/category/tag/min_followers), PATCH: tag güncelleme
+      discover.js            # Yeni mağaza bulma - Store Leads + DDG + crt.sh + .com.tr tarama, paralel çalışır
+      enrich.js              # İletişim bilgisi çekme + snowball keşif - enriched_at IS NULL olanlardan 5'er batch
+    leads.js                 # GET: filtreli JSON API (pagination ile tüm veri), PATCH: tag güncelleme
+    cleanup.js               # Tek seferlik çöp temizleme endpoint'i (?dry=true ile önizleme)
   public/
-    leads.html               # Dashboard - arama, filtreleme (kategori/tag/telefon/whatsapp/ig), sıralama, tag dropdown (anında kaydeder), taglenenler tepede
+    leads.html               # Dashboard - arama, filtreleme, sıralama, tag dropdown
   schema.sql                 # Tablo tanımı
   migration-add-tag.sql      # Tag kolonu ekleme
   vercel.json                # Rewrites: / -> /leads.html (cron yok, harici cron kullanılıyor)
@@ -55,18 +55,17 @@ lead_miner/
 
 ## Keşif Kaynakları
 1. **Store Leads** (storeleads.app) - 55 şehir, 24 region, 21 kategori, 24 app (TR filtreli), 5 teknoloji sayfası
-2. **CartInsight** - Türk mağaza tablosu
-3. **Skailama** - Türk mağaza listesi
-4. **AfterShip** - Top 100 TR
-5. **Analyzify** - Türk mağaza listesi
-6. **EcommerceDB** - TR Shopify ranking
-7. **ShopiStores** - Turkey mağaza listesi
-8. **BuiltWith Trends** - Shopify/Turkey
-9. **SimilarTech** - Shopify/Turkey
-10. **DuckDuckGo** - 90+ Türkçe arama sorgusu (myshopify.com + niche/şehir/ödeme kalıpları)
+2. **Skailama** - Türk mağaza listesi
+3. **Analyzify** - Türk mağaza listesi
+4. **Türk Ajans Portföyleri** - shopifyuzmani.com.tr, digitalexchange.com.tr, eticaret.pro
+5. **Webrazzi** - E-ticaret haberleri ve mağaza referansları
+6. **DuckDuckGo** - 80+ Türkçe arama sorgusu (niche, ajans referans, "Powered by Shopify" + TR sinyalleri)
+7. **crt.sh** - SSL sertifika keşfi (myshopify.com subdomainleri)
+8. **crt.sh + products.json** - .com.tr domain tarama ve Shopify doğrulama
+9. **Snowball** - Enrich sırasında mağaza sayfalarındaki outbound linklerden yeni mağaza keşfi
 
 ## Akış
 1. **Discover** yeni URL bulur → `shopify_stores`'a `enriched_at=NULL` olarak ekler
-2. **Enrich** `enriched_at IS NULL` olanları alır → siteyi ziyaret eder → email/tel/insta/wa çeker → `enriched_at` doldurur
-3. **Instagram** `instagram IS NOT NULL AND ig_fetched_at IS NULL` olanları alır → IG API'den takipçi çeker → `ig_fetched_at` doldurur
-4. **Dashboard** sadece `enriched_at IS NOT NULL` ve `is_shopify=true` olanları gösterir
+2. **Enrich** `enriched_at IS NULL` olanları alır → siteyi ziyaret eder → email/tel/insta/wa çeker → `enriched_at` doldurur → **sayfadaki outbound linklerden yeni mağaza keşfeder (snowball)**
+3. **Instagram** DDG araması ile IG bulamazsa enrich içinde DDG ile arar
+4. **Dashboard** sadece `enriched_at IS NOT NULL` ve `is_shopify=true` olanları gösterir (pagination ile tüm veri)
