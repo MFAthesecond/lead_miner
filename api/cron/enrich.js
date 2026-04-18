@@ -195,9 +195,10 @@ function extractOutboundStores(html, ownHost) {
 
       const isShopifyDomain = host.endsWith('.myshopify.com');
       const isTrDomain = host.endsWith('.com.tr') || host.endsWith('.tr');
-      const isComDomain = host.endsWith('.com') && !host.includes('.');
+      const dots = host.split('.').length;
+      const isSimpleCom = host.endsWith('.com') && dots === 2;
 
-      if (isShopifyDomain || isTrDomain) {
+      if (isShopifyDomain || isTrDomain || isSimpleCom) {
         found.add('https://' + host);
       }
     } catch {}
@@ -320,6 +321,38 @@ async function enrichOne(url) {
   };
 }
 
+async function snowballExisting(supabase) {
+  const { data: stores } = await supabase
+    .from('shopify_stores')
+    .select('id, url')
+    .eq('is_shopify', true)
+    .not('enriched_at', 'is', null)
+    .order('created_at', { ascending: true })
+    .limit(3);
+
+  if (!stores || stores.length === 0) return { snowball_scanned: 0, snowball_discovered: 0 };
+
+  let discovered = 0;
+  for (const store of stores) {
+    try {
+      const html = await fetchPage(store.url);
+      if (!html) continue;
+      let ownHost = '';
+      try { ownHost = new URL(store.url).hostname.toLowerCase().replace(/^www\./, ''); } catch {}
+      const links = extractOutboundStores(html, ownHost);
+      if (links.length) {
+        const newRows = links.map(u => ({ url: u, domain: domainFromUrl(u) }));
+        const { data: inserted } = await supabase
+          .from('shopify_stores')
+          .upsert(newRows, { onConflict: 'url', ignoreDuplicates: true })
+          .select('id');
+        discovered += (inserted || []).length;
+      }
+    } catch {}
+  }
+  return { snowball_scanned: stores.length, snowball_discovered: discovered };
+}
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -332,7 +365,11 @@ module.exports = async function handler(req, res) {
     .limit(BATCH_SIZE);
 
   if (error) return res.status(500).json({ error: error.message });
-  if (!rows || rows.length === 0) return res.json({ ok: true, enriched: 0, message: 'Nothing to enrich' });
+
+  if (!rows || rows.length === 0) {
+    const snowballResult = await snowballExisting(supabase);
+    return res.json({ ok: true, enriched: 0, message: 'Nothing to enrich', ...snowballResult });
+  }
 
   let snowballTotal = 0;
   const results = await Promise.all(rows.map(async (row) => {

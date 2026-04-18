@@ -299,8 +299,32 @@ function extractDomains(html, isSkailama) {
   return domains;
 }
 
+const DDG_SKIP_HOSTS = new Set([
+  'shopify.com','www.shopify.com','apps.shopify.com','help.shopify.com',
+  'community.shopify.com','themes.shopify.com',
+  'google.com','www.google.com','google.com.tr',
+  'youtube.com','www.youtube.com',
+  'facebook.com','www.facebook.com','instagram.com','www.instagram.com',
+  'twitter.com','x.com','linkedin.com','www.linkedin.com',
+  'pinterest.com','www.pinterest.com','tiktok.com','www.tiktok.com',
+  'reddit.com','www.reddit.com','quora.com','www.quora.com',
+  'wikipedia.org','en.wikipedia.org','tr.wikipedia.org',
+  'medium.com','wordpress.com','blogger.com','github.com',
+  'amazon.com','amazon.com.tr','ebay.com','etsy.com','aliexpress.com',
+  'trendyol.com','www.trendyol.com','hepsiburada.com','www.hepsiburada.com',
+  'n11.com','www.n11.com','sahibinden.com','www.sahibinden.com',
+  'storeleads.app','www.storeleads.app',
+  'analyzify.com','www.analyzify.com',
+  'webrazzi.com','www.webrazzi.com',
+  'cloudflare.com','vercel.app','netlify.app','herokuapp.com',
+  'apple.com','play.google.com','apps.apple.com',
+]);
+
 async function searchDDG(query) {
   const domains = new Set();
+  const isShopifyFooterQuery = query.includes('Powered by Shopify') ||
+    query.includes('sepete ekle') || query.includes('kapıda ödeme') ||
+    query.includes('havale') || query.includes('₺');
   try {
     const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
     const resp = await fetch(url, {
@@ -317,9 +341,14 @@ async function searchDDG(query) {
       if (!m) return;
       try {
         const u = new URL(m[1]);
-        const host = u.hostname.toLowerCase();
-        if (host.includes('myshopify.com') ||
-            (host.endsWith('.com.tr') && !host.includes('shopify.com') && !host.includes('google'))) {
+        const host = u.hostname.toLowerCase().replace(/^www\./, '');
+        if (DDG_SKIP_HOSTS.has(host) || DDG_SKIP_HOSTS.has('www.' + host)) return;
+        if (host.includes('google.') || host.includes('facebook.')) return;
+
+        if (host.includes('myshopify.com') || host.endsWith('.com.tr')) {
+          const d = 'https://' + host;
+          if (!isBigBrand(d)) domains.add(d);
+        } else if (isShopifyFooterQuery && host.endsWith('.com') && !host.includes('.com.')) {
           const d = 'https://' + host;
           if (!isBigBrand(d)) domains.add(d);
         }
