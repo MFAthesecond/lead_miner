@@ -322,13 +322,20 @@ async function enrichOne(url) {
 }
 
 async function snowballExisting(supabase) {
+  const { count } = await supabase
+    .from('shopify_stores')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_shopify', true)
+    .not('enriched_at', 'is', null);
+
+  const total = count || 0;
+  const offset = total > 3 ? Math.floor(Math.random() * (total - 3)) : 0;
   const { data: stores } = await supabase
     .from('shopify_stores')
     .select('id, url')
     .eq('is_shopify', true)
     .not('enriched_at', 'is', null)
-    .order('created_at', { ascending: true })
-    .limit(3);
+    .range(offset, offset + 2);
 
   if (!stores || stores.length === 0) return { snowball_scanned: 0, snowball_discovered: 0 };
 
