@@ -399,36 +399,71 @@ async function isShopifyDomain(domain) {
   } catch { return false; }
 }
 
-const TR_BRAND_WORDS = [
-  'aksesuar','alin','ankara','antep','antalya','atelier','atolye',
-  'ayakkabi','bahar','bahce','bal','bebek','beyaz','boncuk','butik',
+const TR_WORDS = [
+  'aksesuar','alin','altun','altin','amber','ankara','antep','antalya',
+  'asil','atelier','atolye','ayakkabi','ayna','azra',
+  'bahar','bahce','bal','baran','bebek','bella','beyaz','boncuk','butik',
   'cafe','canim','canta','cicek','cocuk','concept','cuzdan',
-  'deco','dekor','deri','design','dijital','dogal','doga','dukkan',
-  'el','elbise','elit','emir','erdem','erzurum',
-  'fashion','fit','flora',
-  'giyim','gold','gumus','gurme','guzel','guzellik',
+  'deco','dekor','deri','design','dijital','dogal','doga','dream','dukkan',
+  'ege','el','elbise','elif','elit','emir','erdem','erzurum','esarp',
+  'fashion','felt','fit','flora','fresh',
+  'galeri','gala','giyim','gold','green','gumus','gurme','guzel','guzellik',
   'hali','hamam','hanim','hayat','hediye','home','house',
-  'istanbul','izmir',
-  'kahve','kedi','kilim','konak','kozmetik','kraft','kutu',
-  'leziz','lokum','lux','luxury',
-  'marka','market','mercan','moda','mobilya','mutfak',
-  'naturel','nazar','nur',
-  'olive','organic','organik','ottoman','ozel',
-  'pasha','peri','premier','premium',
-  'rose','ruh',
-  'sanat','sapka','sari','seker','sepet','shop','silver','sofra','stil','store','sultan',
-  'taki','tasarim','tekne','tekstil','toptan','trend','turk','turkish',
-  'vintage',
-  'yesil','yildiz','yore','yoresel',
-  'zehra','zeytin','zen',
+  'ipek','istanbul','izmir',
+  'jewel','joy',
+  'kahve','kedi','kent','kilim','konak','kozmetik','kraft','kutu',
+  'lavanta','leziz','lila','lokum','luna','lux','luxury',
+  'mango','marka','market','maya','mercan','misk','moda','mobilya','mutfak',
+  'narin','naturel','nazar','nil','nova','nur',
+  'olive','onyx','organic','organik','orient','ottoman','ozel',
+  'pasha','pastel','pearl','peri','petra','premier','premium','pure',
+  'retro','rose','royal','ruh','ruya',
+  'sanat','sapka','sari','seker','selvi','sepet','seramik','shop',
+  'silver','sofra','star','stil','stone','store','sultan','sun',
+  'taki','tasarim','tekne','tekstil','terra','toptan','trend','turk','turkish',
+  'unique','urba',
+  'vera','vibe','vida','vintage','vita',
+  'yali','yesil','yildiz','yore','yoresel',
+  'zehra','zeytin','zen','zara',
 ];
+
+const TR_PREFIXES = [
+  'istanbul','ankara','izmir','antalya','turk','turkish','tr',
+  'my','the','casa','maison','haus','la','el',
+];
+const TR_SUFFIXES = [
+  'shop','store','butik','moda','home','deri','design','art',
+  'style','wear','life','craft','made','co','hub','tr',
+];
+
+function generateBruteCandidates(count) {
+  const candidates = new Set();
+  const words = [...TR_WORDS].sort(() => Math.random() - 0.5);
+
+  for (const w of words) {
+    if (candidates.size >= count) break;
+    candidates.add(w);
+  }
+
+  while (candidates.size < count) {
+    const prefix = TR_PREFIXES[Math.floor(Math.random() * TR_PREFIXES.length)];
+    const suffix = TR_SUFFIXES[Math.floor(Math.random() * TR_SUFFIXES.length)];
+    const word = TR_WORDS[Math.floor(Math.random() * TR_WORDS.length)];
+    const r = Math.random();
+    if (r < 0.33) candidates.add(`${word}-${suffix}`);
+    else if (r < 0.66) candidates.add(`${prefix}-${word}`);
+    else candidates.add(`${word}${suffix}`);
+  }
+
+  return [...candidates].slice(0, count);
+}
 
 async function bruteForceMyshopify() {
   const domains = new Set();
-  const shuffled = [...TR_BRAND_WORDS].sort(() => Math.random() - 0.5).slice(0, 10);
+  const candidates = generateBruteCandidates(15);
 
-  const checks = await Promise.all(shuffled.map(async (word) => {
-    const host = `${word}.myshopify.com`;
+  const checks = await Promise.all(candidates.map(async (slug) => {
+    const host = `${slug}.myshopify.com`;
     try {
       const resp = await fetch(`https://${host}/products.json?limit=1`, {
         headers: { 'User-Agent': UA },
