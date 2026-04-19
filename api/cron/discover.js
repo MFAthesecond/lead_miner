@@ -497,7 +497,7 @@ async function searchDDG(query) {
 
 async function searchGoogle(query) {
   const domains = new Set();
-  const start = Math.floor(Math.random() * 5) * 10;
+  const start = Math.floor(Math.random() * 10) * 10;
   try {
     const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&start=${start}&hl=tr&gl=tr`;
     const resp = await fetch(url, {
@@ -704,21 +704,31 @@ module.exports = async function handler(req, res) {
     } catch { return []; }
   });
 
-  const googleQuery = generateDynamicDDGQueries(1)[0];
+  const googleQueries = generateDynamicDDGQueries(2);
   const ddgPs = allDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
-  const googleP = searchGoogle(googleQuery).then(s => [...s]).catch(() => []);
+  const googlePs = googleQueries.map(q => searchGoogle(q).then(s => [...s]).catch(() => []));
   const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
   const comTrP = discoverComTr().then(s => [...s]).catch(() => []);
   const bruteP = bruteForceMyshopify().then(s => [...s]).catch(() => []);
 
-  const results = await Promise.all([...pagePs, ...ddgPs, googleP, crtP, comTrP, bruteP]);
+  const results = await Promise.all([...pagePs, ...ddgPs, ...googlePs, crtP, comTrP, bruteP]);
   for (const domains of results) {
     for (const d of domains) allUrls.add(d);
   }
 
+  const seen = new Set();
   const rows = [...allUrls]
     .filter(u => !isBigBrand(u))
-    .map(url => ({ url, domain: domainFromUrl(url) }));
+    .map(u => {
+      const d = domainFromUrl(u);
+      const normalized = 'https://' + d;
+      return { url: normalized, domain: d };
+    })
+    .filter(r => {
+      if (seen.has(r.domain)) return false;
+      seen.add(r.domain);
+      return r.domain.length > 3;
+    });
 
   let inserted = 0;
   if (rows.length) {
