@@ -270,6 +270,69 @@ const DDG_QUERIES = [
   '"Powered by Shopify" site:.com.tr',
 ];
 
+const DDG_TEMPLATES = [
+  '{word} online mağaza',
+  '{word} online satış',
+  '{word} online sipariş',
+  '{word} online alışveriş',
+  'online {word} mağaza türkiye',
+  'online {word} satış',
+  '{word} online mağaza istanbul',
+  '{word} online mağaza ankara',
+  '{word} online mağaza izmir',
+  '{word} online mağaza antalya',
+  '{word} online mağaza bursa',
+  'butik {word} online',
+  'butik {word} mağaza',
+  '{word} atölye online satış',
+  '{word} dükkan online',
+  '"{word}" "sepete ekle" "₺"',
+  '"{word}" online "kargo" türkiye',
+  '"{word}" online "kapıda ödeme"',
+  '"Powered by Shopify" "{word}"',
+];
+
+const DDG_NICHE_WORDS = [
+  'giyim','moda','elbise','tişört','pantolon','ceket','mont','triko',
+  'tesettür','eşarp','şal','başörtüsü','ferace','abiye',
+  'ayakkabı','çanta','cüzdan','kemer','çorap','iç giyim','pijama',
+  'takı','bileklik','kolye','yüzük','küpe','broş','gümüş','altın',
+  'saat','gözlük','şapka',
+  'kozmetik','makyaj','parfüm','cilt bakım','saç bakım','güzellik',
+  'doğal kozmetik','organik kozmetik',
+  'ev dekorasyon','mobilya','halı','kilim','perde','aydınlatma','lamba',
+  'mutfak','banyo','havlu','nevresim','yastık','battaniye',
+  'kahve','çay','bal','zeytinyağı','baklava','lokum','peynir',
+  'gurme','organik gıda','baharat','kuruyemiş','çikolata','şekerleme',
+  'bebek','çocuk','oyuncak','mama','biberon',
+  'evcil hayvan','kedi','köpek','akvaryum',
+  'spor','fitness','yoga','bisiklet','kamp','outdoor',
+  'telefon kılıf','tablet aksesuar','elektronik',
+  'kitap','kırtasiye','hobi','puzzle','boncuk','örgü','iplik',
+  'deri','çanta deri','cüzdan deri','kemer deri',
+  'seramik','cam','ahşap','bambu','hasır','rattan',
+  'mum','sabun','aromaterapi','buhurdanlık',
+  'poster','tablo','kanvas','çerçeve',
+  'bahçe','saksı','tohum','fide',
+  'düğün','nikah şekeri','gelin','damat',
+  'hediye','hediyelik','promosyon',
+  'vitamin','takviye','protein','doğal ilaç',
+  'pet giyim','tasma','mama kabı',
+  'müzik','gitar','bağlama','ud',
+  'oto aksesuar','araç parfüm','araç koku',
+  'havuz','şişme','deniz','plaj',
+];
+
+function generateDynamicDDGQueries(count) {
+  const queries = new Set();
+  while (queries.size < count) {
+    const template = DDG_TEMPLATES[Math.floor(Math.random() * DDG_TEMPLATES.length)];
+    const word = DDG_NICHE_WORDS[Math.floor(Math.random() * DDG_NICHE_WORDS.length)];
+    queries.add(template.replace('{word}', word));
+  }
+  return [...queries];
+}
+
 const PAGES_PER_RUN = 2;
 const DDG_PER_RUN = 5;
 
@@ -590,7 +653,9 @@ module.exports = async function handler(req, res) {
   let source = 'pages+ddg+crtsh';
 
   const shuffledPages = [...ALL_PAGES].sort(() => Math.random() - 0.5).slice(0, PAGES_PER_RUN);
-  const shuffledDDG = [...DDG_QUERIES].sort(() => Math.random() - 0.5).slice(0, DDG_PER_RUN);
+  const staticDDG = [...DDG_QUERIES].sort(() => Math.random() - 0.5).slice(0, 2);
+  const dynamicDDG = generateDynamicDDGQueries(3);
+  const allDDG = [...staticDDG, ...dynamicDDG];
 
   const pagePs = shuffledPages.map(async (url) => {
     try {
@@ -604,7 +669,7 @@ module.exports = async function handler(req, res) {
     } catch { return []; }
   });
 
-  const ddgPs = shuffledDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
+  const ddgPs = allDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
   const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
   const comTrP = discoverComTr().then(s => [...s]).catch(() => []);
   const bruteP = bruteForceMyshopify().then(s => [...s]).catch(() => []);
@@ -614,7 +679,6 @@ module.exports = async function handler(req, res) {
     for (const d of domains) allUrls.add(d);
   }
 
-  // Upsert
   const rows = [...allUrls]
     .filter(u => !isBigBrand(u))
     .map(url => ({ url, domain: domainFromUrl(url) }));
@@ -631,7 +695,9 @@ module.exports = async function handler(req, res) {
   return res.json({
     ok: true,
     source,
+    queries: allDDG,
     domains_found: allUrls.size,
+    domains: [...allUrls].slice(0, 30),
     inserted,
   });
 };
