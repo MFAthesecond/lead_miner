@@ -495,6 +495,41 @@ async function searchDDG(query) {
   return allDomains;
 }
 
+async function searchGoogle(query) {
+  const domains = new Set();
+  const start = Math.floor(Math.random() * 5) * 10;
+  try {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20&start=${start}&hl=tr&gl=tr`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return domains;
+    const html = await resp.text();
+
+    const urlRx = /https?:\/\/(?:www\.)?([a-z0-9][-a-z0-9]*(?:\.[a-z0-9][-a-z0-9]*)+)/gi;
+    let m;
+    while ((m = urlRx.exec(html)) !== null) {
+      const host = m[1].toLowerCase();
+      if (DDG_SKIP_HOSTS.has(host) || DDG_SKIP_HOSTS.has('www.' + host)) continue;
+      if (host.includes('google') || host.includes('gstatic') || host.includes('googleapis')) continue;
+      if (host.includes('facebook') || host.includes('youtube') || host.includes('schema.org')) continue;
+      const dots = host.split('.').length;
+      const isEcommerce = host.endsWith('.com.tr') || host.endsWith('.com') ||
+        host.endsWith('.shop') || host.endsWith('.store') ||
+        host.includes('myshopify.com');
+      if (isEcommerce && dots <= 3 && host.length > 5) {
+        if (!isBigBrand('https://' + host)) domains.add('https://' + host);
+      }
+    }
+  } catch {}
+  return domains;
+}
+
 async function searchCrtSh() {
   const domains = new Set();
   try {
@@ -669,12 +704,14 @@ module.exports = async function handler(req, res) {
     } catch { return []; }
   });
 
+  const googleQuery = generateDynamicDDGQueries(1)[0];
   const ddgPs = allDDG.map(q => searchDDG(q).then(s => [...s]).catch(() => []));
+  const googleP = searchGoogle(googleQuery).then(s => [...s]).catch(() => []);
   const crtP = searchCrtSh().then(s => [...s]).catch(() => []);
   const comTrP = discoverComTr().then(s => [...s]).catch(() => []);
   const bruteP = bruteForceMyshopify().then(s => [...s]).catch(() => []);
 
-  const results = await Promise.all([...pagePs, ...ddgPs, crtP, comTrP, bruteP]);
+  const results = await Promise.all([...pagePs, ...ddgPs, googleP, crtP, comTrP, bruteP]);
   for (const domains of results) {
     for (const d of domains) allUrls.add(d);
   }
