@@ -727,7 +727,10 @@ module.exports = async function handler(req, res) {
     .filter(r => {
       if (seen.has(r.domain)) return false;
       seen.add(r.domain);
-      return r.domain.length > 3;
+      if (r.domain.length <= 3) return false;
+      if (r.domain.includes('@')) return false;
+      if (r.domain.includes('info@') || r.domain.includes('mailto')) return false;
+      return true;
     });
 
   let inserted = 0;
