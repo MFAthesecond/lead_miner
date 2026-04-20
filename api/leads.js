@@ -50,12 +50,21 @@ module.exports = async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    const { id, tag } = req.body || {};
+    const body = req.body || {};
+    const { id } = body;
     if (!id) return res.status(400).json({ error: 'id required' });
+
+    const ALLOWED = ['tag','phones','emails','whatsapp','instagram','category','store_name'];
+    const update = {};
+    for (const key of ALLOWED) {
+      if (key in body) update[key] = body[key] === '' ? null : body[key];
+    }
+
+    if (Object.keys(update).length === 0) return res.status(400).json({ error: 'no fields to update' });
 
     const { error } = await supabase
       .from('shopify_stores')
-      .update({ tag: tag || null })
+      .update(update)
       .eq('id', id);
 
     if (error) return res.status(500).json({ error: error.message });

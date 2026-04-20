@@ -43,6 +43,10 @@
     .tag-select.t-musteri{background:#cce5ff;border-color:#007bff}
     .tag-select.t-reddetti{background:#f8d7da;border-color:#dc3545}
     .tag-select.t-sonra{background:#e2e3e5;border-color:#6c757d}
+    .editable{cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .2s}
+    .editable:hover{border-bottom-color:#5b5ea6}
+    .edit-input{padding:2px 4px;border:1px solid #5b5ea6;border-radius:3px;font-size:12px;width:100%;outline:none;background:#f8f9ff}
+    .edit-ok{color:#28a745;font-size:10px;margin-left:2px}
   </style>
 </head>
 <body>
@@ -173,13 +177,13 @@ function renderTable(){
     rows+=`<tr class="${hp}">
       <td>${i+1}</td>
       <td class="nm">${d.store_name||d.domain||''}</td>
-      <td>${phone?`<a href="tel:${phone}">${phone}</a>`:'<span class="e">-</span>'}</td>
-      <td>${wa?`<a href="https://wa.me/${wa}" target="_blank">${wa}</a>`:'<span class="e">-</span>'}</td>
-      <td>${email?`<a href="mailto:${email}">${email}</a>`:'<span class="e">-</span>'}</td>
-      <td>${igUser?`<a href="${igLink}" target="_blank">${igUser}</a>`:'<span class="e">-</span>'}</td>
+      <td class="editable" onclick="editCell(${d.id},'phones','${esc(phone)}')">${phone?`<a href="tel:${phone}" onclick="event.stopPropagation()">${phone}</a>`:'<span class="e">-</span>'}</td>
+      <td class="editable" onclick="editCell(${d.id},'whatsapp','${esc(wa)}')">${wa?`<a href="https://wa.me/${wa}" target="_blank" onclick="event.stopPropagation()">${wa}</a>`:'<span class="e">-</span>'}</td>
+      <td class="editable" onclick="editCell(${d.id},'emails','${esc(email)}')">${email?`<a href="mailto:${email}" onclick="event.stopPropagation()">${email}</a>`:'<span class="e">-</span>'}</td>
+      <td class="editable" onclick="editCell(${d.id},'instagram','${esc(igUser.replace('@',''))}')">${igUser?`<a href="${igLink}" target="_blank" onclick="event.stopPropagation()">${igUser}</a>`:'<span class="e">-</span>'}</td>
       <td class="ig">${igDisp}</td>
       <td><a href="${d.url}" target="_blank">Ac</a></td>
-      <td>${cat?`<span class="badge badge-cat">${cat}</span>`:''}</td>
+      <td class="editable" onclick="editCell(${d.id},'category','${esc(cat)}')">${cat?`<span class="badge badge-cat">${cat}</span>`:'<span class="e">-</span>'}</td>
       <td>${tagSelect(d)}</td>
       <td>${d.product_count||'-'}</td>
     </tr>`;
@@ -245,6 +249,50 @@ function doSort(col){
   if(sortCol===col) sortDir=sortDir==='asc'?'desc':'asc';
   else{sortCol=col;sortDir='desc';}
   renderTable();
+}
+
+function esc(s){return (s||'').replace(/'/g,'&#39;').replace(/"/g,'&quot;')}
+
+function editCell(id, field, current){
+  const td=event.currentTarget;
+  if(td.querySelector('.edit-input')) return;
+  const input=document.createElement('input');
+  input.className='edit-input';
+  input.value=current;
+  input.placeholder=field==='phones'?'05xx xxx xxxx':field==='emails'?'email@ornek.com':field==='whatsapp'?'905xxxxxxxxx':field==='instagram'?'kullanici_adi':field==='category'?'Kategori':'';
+  td.innerHTML='';
+  td.appendChild(input);
+  input.focus();
+  input.select();
+
+  async function save(){
+    const val=input.value.trim();
+    let body={id};
+    if(field==='phones') body.phones=val?[val]:[];
+    else if(field==='emails') body.emails=val?[val]:[];
+    else if(field==='instagram') body.instagram=val?'https://instagram.com/'+val.replace('@','').replace('https://instagram.com/',''):'';
+    else body[field]=val;
+
+    try{
+      const r=await fetch('/api/leads',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      if(!r.ok) throw new Error('API hata');
+      const item=DATA.find(d=>d.id===id);
+      if(item){
+        if(field==='phones') item.phones=val?[val]:[];
+        else if(field==='emails') item.emails=val?[val]:[];
+        else if(field==='instagram') item.instagram=val?'https://instagram.com/'+val.replace('@','').replace('https://instagram.com/',''):null;
+        else item[field]=val||null;
+      }
+      renderStats();
+      renderTable();
+    }catch(e){alert('Hata: '+e.message);renderTable();}
+  }
+
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter') save();
+    if(e.key==='Escape') renderTable();
+  });
+  input.addEventListener('blur',save);
 }
 
 function applyFilters(){renderTable()}
