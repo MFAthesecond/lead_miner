@@ -5,6 +5,13 @@ const IG_APP_ID = '936619743392459';
 const BATCH_SIZE = 5;
 const DELAY_MS = 1000;
 
+const JUNK_IG_USERS = new Set([
+  'shopify','instagram','facebook','twitter','tiktok',
+  'reel','reels','explore','share','sharer','intent','dialog',
+  'accounts','about','developer','legal','privacy','terms',
+  'stories','direct','tv','p',
+]);
+
 async function getFollowers(username) {
   const endpoints = [
     `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
@@ -33,29 +40,46 @@ module.exports = async function handler(req, res) {
 
   const supabase = getSupabase();
 
-  const { data: rows, error } = await supabase
+  // Oncelik 1: ig_fetched_at NULL olanlar
+  let { data: rows, error } = await supabase
     .from('shopify_stores')
     .select('id, instagram')
     .not('instagram', 'is', null)
     .is('ig_fetched_at', null)
     .limit(BATCH_SIZE);
 
+  // Oncelik 2: Takipci 0 olup tekrar denenmesi gerekenler
+  if (!error && (!rows || rows.length === 0)) {
+    const retry = await supabase
+      .from('shopify_stores')
+      .select('id, instagram')
+      .not('instagram', 'is', null)
+      .eq('ig_followers', 0)
+      .eq('is_shopify', true)
+      .not('enriched_at', 'is', null)
+      .limit(BATCH_SIZE);
+    if (!retry.error && retry.data) rows = retry.data;
+  }
+
   if (error) return res.status(500).json({ error: error.message });
   if (!rows || rows.length === 0) return res.json({ ok: true, fetched: 0, message: 'All done' });
 
   let fetched = 0;
+  let cleaned = 0;
   let rateLimited = false;
 
   for (const row of rows) {
     const username = row.instagram
       .replace('https://instagram.com/', '')
       .replace('https://www.instagram.com/', '')
-      .replace('@', '');
+      .replace('@', '')
+      .replace(/\/$/, '');
 
-    if (!username || username === 'reel') {
+    if (!username || JUNK_IG_USERS.has(username.toLowerCase())) {
       await supabase.from('shopify_stores')
-        .update({ ig_fetched_at: new Date().toISOString() })
+        .update({ instagram: null, ig_followers: 0, ig_fetched_at: new Date().toISOString() })
         .eq('id', row.id);
+      cleaned++;
       continue;
     }
 
@@ -80,8 +104,8 @@ module.exports = async function handler(req, res) {
   return res.json({
     ok: true,
     fetched,
+    cleaned,
     total: rows.length,
     rateLimited,
-    remaining: rateLimited ? 'Will retry next cron run' : undefined,
   });
 };
