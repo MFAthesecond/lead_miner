@@ -56,8 +56,8 @@ async function main() {
 
     if (limited) {
       console.log(`\n  Rate limit! ${i} hesap islendi, ${rows.length - i} kaldi.`);
-      console.log('  5 dk bekleyip tekrar deniyor...\n');
-      await new Promise(r => setTimeout(r, 300000));
+      console.log('  30 dk bekleyip tekrar deniyor...\n');
+      await new Promise(r => setTimeout(r, 1800000));
       i--;
       continue;
     }

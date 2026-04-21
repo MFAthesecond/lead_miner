@@ -36,13 +36,17 @@
     .badge-cat{background:#eef;color:#5b5ea6}
     .ig{text-align:right;font-variant-numeric:tabular-nums}
     .loading{text-align:center;padding:60px;color:#888;font-size:16px}
-    .tag-select{padding:3px 6px;border:1px solid #ddd;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;width:100px}
-    .tag-select.t-arandi{background:#fff3cd;border-color:#ffc107}
+    .tag-select{padding:3px 6px;border:1px solid #ddd;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;width:120px}
+    .tag-select.t-ulasilamadi{background:#fff3cd;border-color:#ffc107}
+    .tag-select.t-tekrar{background:#e2e3e5;border-color:#6c757d}
+    .tag-select.t-yanlis{background:#f8d7da;border-color:#dc3545}
+    .tag-select.t-mail{background:#d4edda;border-color:#28a745}
+    .tag-select.t-mesgul{background:#fce4ec;border-color:#e91e63}
+    .tag-select.t-toplanti{background:#cce5ff;border-color:#007bff}
+    .tag-select.t-musteri{background:#c8e6c9;border-color:#4caf50}
     .tag-select.t-ilgileniyor{background:#d1ecf1;border-color:#17a2b8}
-    .tag-select.t-teklif{background:#d4edda;border-color:#28a745}
-    .tag-select.t-musteri{background:#cce5ff;border-color:#007bff}
     .tag-select.t-reddetti{background:#f8d7da;border-color:#dc3545}
-    .tag-select.t-sonra{background:#e2e3e5;border-color:#6c757d}
+    .note-cell{max-width:140px;font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .editable{cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .2s}
     .editable:hover{border-bottom-color:#5b5ea6}
     .edit-input{padding:2px 4px;border:1px solid #5b5ea6;border-radius:3px;font-size:12px;width:100%;outline:none;background:#f8f9ff}
@@ -58,14 +62,17 @@
     <input type="text" id="search" placeholder="Magaza ara..." oninput="applyFilters()">
     <select id="catF" onchange="applyFilters()"><option value="">Tum Kategoriler</option></select>
     <select id="tagF" onchange="applyFilters()">
-      <option value="">Tum Tagler</option>
-      <option value="Arandi">Arandi</option>
+      <option value="">Tum Durumlar</option>
+      <option value="Ulasilamadi">Ulasilamadi</option>
+      <option value="Tekrar Aranacak">Tekrar Aranacak</option>
+      <option value="Numara Yanlis">Numara Yanlis</option>
+      <option value="Mail Iletildi">Mail Iletildi</option>
+      <option value="Mesgul">Mesgul</option>
+      <option value="Toplanti Alindi">Toplanti Alindi</option>
       <option value="Ilgileniyor">Ilgileniyor</option>
-      <option value="Teklif Verildi">Teklif Verildi</option>
       <option value="Musteri">Musteri</option>
       <option value="Reddetti">Reddetti</option>
-      <option value="Sonra Ara">Sonra Ara</option>
-      <option value="_none">Tagsiz</option>
+      <option value="_none">Durumu Yok</option>
     </select>
     <label><input type="checkbox" id="fPhone" onchange="applyFilters()"> Telefonlu</label>
     <label><input type="checkbox" id="fWa" onchange="applyFilters()"> WhatsApp</label>
@@ -80,21 +87,27 @@ let sortCol=-1,sortDir='desc';
 
 const TAG_OPTIONS = [
   {value:'',label:'-'},
-  {value:'Arandi',label:'Arandi'},
+  {value:'Ulasilamadi',label:'Ulasilamadi'},
+  {value:'Tekrar Aranacak',label:'Tekrar Aranacak'},
+  {value:'Numara Yanlis',label:'Numara Yanlis'},
+  {value:'Mail Iletildi',label:'Mail Iletildi'},
+  {value:'Mesgul',label:'Mesgul'},
+  {value:'Toplanti Alindi',label:'Toplanti Alindi'},
   {value:'Ilgileniyor',label:'Ilgileniyor'},
-  {value:'Teklif Verildi',label:'Teklif Verildi'},
   {value:'Musteri',label:'Musteri'},
   {value:'Reddetti',label:'Reddetti'},
-  {value:'Sonra Ara',label:'Sonra Ara'},
 ];
 
 const TAG_CLASS = {
-  'Arandi':'t-arandi',
+  'Ulasilamadi':'t-ulasilamadi',
+  'Tekrar Aranacak':'t-tekrar',
+  'Numara Yanlis':'t-yanlis',
+  'Mail Iletildi':'t-mail',
+  'Mesgul':'t-mesgul',
+  'Toplanti Alindi':'t-toplanti',
   'Ilgileniyor':'t-ilgileniyor',
-  'Teklif Verildi':'t-teklif',
   'Musteri':'t-musteri',
   'Reddetti':'t-reddetti',
-  'Sonra Ara':'t-sonra',
 };
 
 async function load(){
@@ -159,7 +172,7 @@ function renderTable(){
   const filtered=getFiltered();
   document.getElementById('count').textContent=`${filtered.length} / ${DATA.length}`;
 
-  const cols=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Tag','Urun'];
+  const cols=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Durum','Not','Urun'];
   const ths=cols.map((h,i)=>`<th onclick="doSort(${i})"${sortCol===i?' class="sorted"':''}>${h} <span class="arr">${sortCol===i?(sortDir==='asc'?'\u25B2':'\u25BC'):'\u25B2'}</span></th>`).join('');
 
   let rows='';
@@ -185,6 +198,7 @@ function renderTable(){
       <td><a href="${d.url}" target="_blank">Ac</a></td>
       <td class="editable" onclick="editCell(${d.id},'category','${esc(cat)}')">${cat?`<span class="badge badge-cat">${cat}</span>`:'<span class="e">-</span>'}</td>
       <td>${tagSelect(d)}</td>
+      <td class="note-cell editable" onclick="editCell(${d.id},'notes','${esc(d.notes||'')}')" title="${esc(d.notes||'')}">${d.notes||'<span class="e">-</span>'}</td>
       <td>${d.product_count||'-'}</td>
     </tr>`;
   });
@@ -215,7 +229,7 @@ function getFiltered(){
   });
 
   // Taglenenler her zaman uste
-  const TAG_ORDER = {'Musteri':1,'Ilgileniyor':2,'Teklif Verildi':3,'Arandi':4,'Sonra Ara':5,'Reddetti':6};
+  const TAG_ORDER = {'Musteri':1,'Toplanti Alindi':2,'Ilgileniyor':3,'Mail Iletildi':4,'Tekrar Aranacak':5,'Mesgul':6,'Ulasilamadi':7,'Numara Yanlis':8,'Reddetti':9};
   arr.sort((a,b)=>{
     const ta = a.tag ? (TAG_ORDER[a.tag]||7) : 99;
     const tb = b.tag ? (TAG_ORDER[b.tag]||7) : 99;
@@ -232,7 +246,7 @@ function getFiltered(){
 }
 
 function sortData(arr){
-  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','tag','product_count'][sortCol];
+  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','tag','notes','product_count'][sortCol];
   if(!key)return arr;
   return arr.slice().sort((a,b)=>{
     let va=a[key]??'', vb=b[key]??'';

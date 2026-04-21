@@ -15,7 +15,9 @@ Supabase'de tek tablo: `shopify_stores`
 
 Kolonlar: `id, url, domain, store_name, emails (text[]), phones (text[]), instagram, ig_followers (int), whatsapp, facebook, tiktok, category, currency, product_count, description, is_shopify (bool), tag (text), discovered_at, enriched_at, ig_fetched_at, created_at`
 
-Tag değerleri: `Arandi, Ilgileniyor, Teklif Verildi, Musteri, Reddetti, Sonra Ara`
+Tag değerleri: `Ulasilamadi, Tekrar Aranacak, Numara Yanlis, Mail Iletildi, Mesgul, Toplanti Alindi, Ilgileniyor, Musteri, Reddetti`
+
+Ek kolon: `notes (text)` - serbest metin not alanı
 
 ## Dosya Yapısı
 ```

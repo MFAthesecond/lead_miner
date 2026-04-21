@@ -54,7 +54,7 @@ module.exports = async function handler(req, res) {
     const { id } = body;
     if (!id) return res.status(400).json({ error: 'id required' });
 
-    const ALLOWED = ['tag','phones','emails','whatsapp','instagram','category','store_name'];
+    const ALLOWED = ['tag','phones','emails','whatsapp','instagram','category','store_name','notes'];
     const update = {};
     for (const key of ALLOWED) {
       if (key in body) update[key] = body[key] === '' ? null : body[key];
