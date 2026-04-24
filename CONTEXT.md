@@ -52,13 +52,12 @@ lead_miner/
     cron/
       discover.js              # Shopify: storeleads.app'ten yeni Shopify mağaza bulma
       enrich.js                # Shopify: iletişim bilgisi çekme + snowball (TÜM domainleri scrape eder, sadece shopify değil)
-      instagram.js             # Shopify: IG takipçi sayısı (DEVRE DIŞI - cron-job.org'da kapalı)
       tr-extra-domains.js      # Lead havuzu: Tsoft + Ticimax referans sayfalarindan domain çek (sıfır IG API, sıfır search engine)
       ig-seed.js               # IG: shopify_stores'tan TÜM IG'leri instagram_leads'e kopyala (sıfır IG API)
-      ig-related.js            # IG: mevcut IG hesaplari için "related/chaining" → yeni Türk IG keşfi (~5-15 yeni/seed)
+      ig-related.js            # IG: mevcut IG hesaplari için "related/chaining" → yeni Türk IG keşfi
       ig-enrich.js             # IG: web_profile_info ile bio + business contact + skor (batch=3, delay=3s)
       ig-rescore.js            # IG: 30 günden eski cache yenileme (haftalık)
-      ig-discover.js           # IG: Brave Search API (DEVRE DIŞI - artık kullanmıyoruz)
+      ig-debug.js              # GECICI: IG public endpoint testi - sonra silinecek
     leads.js                   # Shopify: GET filtreli, PATCH tag/notes
     ig-leads.js                # IG: GET filtreli, PATCH tag/notes, POST manuel ekleme
     cleanup.js                 # Shopify: çöp temizleme endpoint'i
