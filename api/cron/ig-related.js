@@ -98,7 +98,7 @@ module.exports = async function handler(req, res) {
   const processedIds = [];
   let rateLimited = false;
   let viaWeb = 0, viaChaining = 0, errors = 0;
-  const debug = req.query?.debug === '1';
+  const debug = true; // GECICI: hep ac, sorun cozulunce kapatacagiz
   const debugLog = debug ? [] : null;
 
   for (const row of rows) {
