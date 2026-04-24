@@ -333,7 +333,7 @@ function generateDynamicDDGQueries(count) {
   return [...queries];
 }
 
-const PAGES_PER_RUN = 2;
+const PAGES_PER_RUN = parseInt(process.env.PAGES_PER_RUN || '5', 10);
 const DDG_PER_RUN = 5;
 
 function extractDomains(html, isSkailama) {
