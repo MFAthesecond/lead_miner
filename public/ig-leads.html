@@ -86,7 +86,8 @@
     <select id="srcF" onchange="applyFilters()">
       <option value="">Tum Kaynaklar</option>
       <option value="seed_shopify">Shopify Seed</option>
-      <option value="ddg_discover">DDG Kesif</option>
+      <option value="brave_discover">Brave Kesif</option>
+      <option value="ddg_discover">DDG Kesif (eski)</option>
       <option value="manual">Manuel</option>
     </select>
     <select id="folF" onchange="applyFilters()">
@@ -152,11 +153,13 @@ const TAG_CLASS = {
 
 const SRC_CLASS = {
   'seed_shopify':'badge-src-seed',
+  'brave_discover':'badge-src-ddg',
   'ddg_discover':'badge-src-ddg',
   'manual':'badge-src-manual',
 };
 const SRC_LABEL = {
   'seed_shopify':'Shopify',
+  'brave_discover':'Brave',
   'ddg_discover':'DDG',
   'manual':'Manuel',
 };

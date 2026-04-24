@@ -45,7 +45,7 @@ lead_miner/
       enrich.js                # Shopify: iletişim bilgisi çekme + snowball
       instagram.js             # Shopify: IG takipçi sayısı (DEVRE DIŞI - cron-job.org'da kapalı)
       ig-seed.js               # IG: shopify_stores'tan 5K+ takipçili IG'leri kopyala (sıfır IG API)
-      ig-discover.js           # IG: DDG ile yeni IG username keşfi (sıfır IG API)
+      ig-discover.js           # IG: Brave Search API ile yeni IG username keşfi (sıfır IG API, BRAVE_API_KEY gerektirir)
       ig-enrich.js             # IG: web_profile_info ile bio + business contact + skor (batch=3, delay=3s)
       ig-rescore.js            # IG: 30 günden eski cache yenileme (haftalık)
     leads.js                   # Shopify: GET filtreli, PATCH tag/notes
@@ -75,7 +75,7 @@ lead_miner/
 | Job | URL | Schedule | Batch | IG API |
 |---|---|---|---|---|
 | IG Seed | /api/cron/ig-seed | 0 3 * * * (günde 1) | tüm 5K+ IG'ler | 0 |
-| IG Discover | /api/cron/ig-discover | */30 * * * * | 2 DDG sorgusu | 0 |
+| IG Discover | /api/cron/ig-discover | */30 * * * * | 1 Brave sorgusu (~20 sonuç) | 0 |
 | IG Enrich | /api/cron/ig-enrich | */15 * * * * | 3 hesap, 3sn delay | ~12/saat |
 | IG Rescore | /api/cron/ig-rescore | 0 4 * * 0 (haftalık) | 3 hesap | düşük |
 
@@ -94,9 +94,9 @@ lead_miner/
 - `SUPABASE_KEY`
 - `CRON_SECRET` (opsiyonel)
 - `SEED_MIN_FOLLOWERS` (default: 5000) - ig-seed eşiği
-- `IG_DISCOVER_DDG_PER_RUN` (default: 3)
-- `IG_DISCOVER_GOOGLE_PER_RUN` (default: 2)
-- `IG_DISCOVER_YANDEX_PER_RUN` (default: 2)
+- `BRAVE_API_KEY` (zorunlu - ig-discover için) - brave.com/search/api free 2000 sorgu/ay
+- `IG_DISCOVER_QUERIES_PER_RUN` (default: 1) - 30dk × 1 sorgu = 1440/ay (free quota altında)
+- `IG_DISCOVER_RESULTS_PER_QUERY` (default: 20)
 - `IG_ENRICH_BATCH` (default: 3)
 - `IG_ENRICH_DELAY_MS` (default: 3000)
 - `IG_RESCORE_BATCH` (default: 3)

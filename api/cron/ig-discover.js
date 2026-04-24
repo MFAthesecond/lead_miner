@@ -1,6 +1,5 @@
-const { getSupabase, verifyCron, UA } = require('../_lib/supabase');
+const { getSupabase, verifyCron } = require('../_lib/supabase');
 const { extractUsername } = require('../_lib/ig');
-const cheerio = require('cheerio');
 
 const NICHES = [
   // Moda / Giyim
@@ -51,14 +50,17 @@ const TEMPLATES = [
   'site:instagram.com "{nis}"',
   'site:instagram.com {nis} dm siparis',
   'site:instagram.com {nis} whatsapp',
-  '{nis} instagram turkiye',
-  '{nis} instagram hesabi',
-  'instagram {nis} turkiye',
 ];
 
-const DDG_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_DDG_PER_RUN || '3', 10);
-const GOOGLE_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_GOOGLE_PER_RUN || '2', 10);
-const YANDEX_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_YANDEX_PER_RUN || '2', 10);
+const QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_QUERIES_PER_RUN || '1', 10);
+const RESULTS_PER_QUERY = parseInt(process.env.IG_DISCOVER_RESULTS_PER_QUERY || '20', 10);
+const BRAVE_API_KEY = process.env.BRAVE_API_KEY || '';
+
+const NON_USER_PATHS = new Set([
+  'reel','reels','p','tv','explore','accounts','stories','direct',
+  'about','developer','legal','privacy','terms','blog','press','help',
+  'web','api','oauth','login','signup','share','sharer',
+]);
 
 function generateQueries(count) {
   const out = new Set();
@@ -72,19 +74,12 @@ function generateQueries(count) {
 
 function nicheFromQuery(q) {
   const lower = q.toLowerCase();
-  // Once en uzun nisleri dene (false positive azaltir)
   const sorted = [...NICHES].sort((a, b) => b.length - a.length);
   for (const n of sorted) {
     if (lower.includes(n)) return n;
   }
   return null;
 }
-
-const NON_USER_PATHS = new Set([
-  'reel','reels','p','tv','explore','accounts','stories','direct',
-  'about','developer','legal','privacy','terms','blog','press','help',
-  'web','api','oauth','login','signup','share','sharer',
-]);
 
 function tryExtractFromUrl(rawUrl) {
   try {
@@ -100,225 +95,89 @@ function tryExtractFromUrl(rawUrl) {
   }
 }
 
-function extractInstagramUsernamesFromDDG(html) {
-  const $ = cheerio.load(html);
-  const found = new Map();
-  const formData = {};
-
-  $('a.result__a, a.result__url').each((_, el) => {
-    const href = $(el).attr('href') || '';
-    const decoded = decodeURIComponent(href);
-    const m = decoded.match(/uddg=(https?[^&]+)/);
-    const target = m ? m[1] : (href.startsWith('http') ? href : null);
-    if (!target) return;
-    const username = tryExtractFromUrl(target);
-    if (!username) return;
-    found.set(username, (found.get(username) || 0) + 1);
-  });
-
-  // Snippet/text icindeki instagram.com/USERNAME pattern'leri
-  const html_text = $.html();
-  const inlineRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})(?:[\/?#"'\s]|$)/gi;
-  let m;
-  while ((m = inlineRx.exec(html_text)) !== null) {
-    const seg = m[1].toLowerCase();
-    if (NON_USER_PATHS.has(seg)) continue;
-    const username = extractUsername(seg);
-    if (!username) continue;
-    found.set(username, (found.get(username) || 0) + 1);
-  }
-
-  $('input[type="hidden"]').each((_, el) => {
-    const name = $(el).attr('name');
-    const val = $(el).attr('value');
-    if (name && val !== undefined) formData[name] = val;
-  });
-
-  return { found, formData };
-}
-
-async function searchDDG(query) {
+async function searchBrave(query) {
   const usernames = new Map();
+  if (!BRAVE_API_KEY) return { usernames, error: 'no_api_key' };
   try {
-    const url = 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(query);
+    const url = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&country=TR&search_lang=tr&count=${RESULTS_PER_QUERY}&safesearch=off`;
     const resp = await fetch(url, {
-      headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' },
-      signal: AbortSignal.timeout(5000),
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip',
+        'X-Subscription-Token': BRAVE_API_KEY,
+      },
+      signal: AbortSignal.timeout(8000),
     });
-    if (!resp.ok) return usernames;
-    const html = await resp.text();
-    const { found, formData } = extractInstagramUsernamesFromDDG(html);
-    for (const [u, n] of found) usernames.set(u, (usernames.get(u) || 0) + n);
+    if (resp.status === 429) return { usernames, error: 'rate_limited' };
+    if (!resp.ok) return { usernames, error: `http_${resp.status}` };
 
-    // Pagination - 2. sayfa
-    if (formData.q && formData.s) {
-      try {
-        const body = Object.entries(formData)
-          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-          .join('&');
-        const resp2 = await fetch('https://html.duckduckgo.com/html/', {
-          method: 'POST',
-          headers: {
-            'User-Agent': UA,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept-Language': 'tr-TR,tr;q=0.9',
-          },
-          body,
-          signal: AbortSignal.timeout(5000),
-        });
-        if (resp2.ok) {
-          const html2 = await resp2.text();
-          const { found: f2 } = extractInstagramUsernamesFromDDG(html2);
-          for (const [u, n] of f2) usernames.set(u, (usernames.get(u) || 0) + n);
-        }
-      } catch {}
+    const data = await resp.json();
+    const results = data?.web?.results || [];
+    for (const r of results) {
+      const candidates = [r.url, r.profile?.url].filter(Boolean);
+      for (const u of candidates) {
+        const username = tryExtractFromUrl(u);
+        if (!username) continue;
+        usernames.set(username, (usernames.get(username) || 0) + 1);
+      }
+      // description ve title icindeki ig.com/USERNAME pattern'leri
+      const text = `${r.title || ''} ${r.description || ''}`;
+      const inlineRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})/gi;
+      let m;
+      while ((m = inlineRx.exec(text)) !== null) {
+        const seg = m[1].toLowerCase();
+        if (NON_USER_PATHS.has(seg)) continue;
+        const username = extractUsername(seg);
+        if (!username) continue;
+        usernames.set(username, (usernames.get(username) || 0) + 1);
+      }
     }
-  } catch {}
-  return usernames;
-}
 
-function extractIgUsernamesFromHtml(html) {
-  const usernames = new Map();
-  const inlineRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})(?:[\/?#"'\s]|$)/gi;
-  let m;
-  while ((m = inlineRx.exec(html)) !== null) {
-    const seg = m[1].toLowerCase();
-    if (NON_USER_PATHS.has(seg)) continue;
-    const username = extractUsername(seg);
-    if (!username) continue;
-    usernames.set(username, (usernames.get(username) || 0) + 1);
-  }
-  return usernames;
-}
-
-async function searchGoogle(query) {
-  const start = Math.floor(Math.random() * 5) * 10;
-  try {
-    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=30&start=${start}&hl=tr&gl=tr`;
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!resp.ok) return new Map();
-    return extractIgUsernamesFromHtml(await resp.text());
-  } catch { return new Map(); }
-}
-
-async function searchYandex(query) {
-  // Yandex Turkiye - lr=11508 Istanbul region kodu, TR sonuclari onceler
-  try {
-    const url = `https://yandex.com.tr/search/?text=${encodeURIComponent(query)}&lr=11508&numdoc=30`;
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'tr-TR,tr;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Referer': 'https://yandex.com.tr/',
-      },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!resp.ok) return new Map();
-    const html = await resp.text();
-    // Yandex captcha sayfasini tespit et
-    if (html.includes('showcaptcha') || html.includes('captcha-page')) return new Map();
-    return extractIgUsernamesFromHtml(html);
-  } catch { return new Map(); }
-}
-
-async function debugFetch(name, url, headers) {
-  try {
-    const r = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
-    const html = await r.text();
-    const matches = [...html.matchAll(/instagram\.com\/([a-zA-Z0-9_.]{2,30})/gi)];
-    return {
-      engine: name,
-      status: r.status,
-      ok: r.ok,
-      html_length: html.length,
-      ig_matches: matches.length,
-      first_5: matches.slice(0, 5).map(m => m[1]),
-      has_captcha: /captcha|unusual traffic|sorry\/index|showcaptcha/i.test(html),
-      sample: html.substring(0, 200),
-    };
+    return { usernames, count: results.length };
   } catch (e) {
-    return { engine: name, error: e.message };
+    return { usernames, error: e.message };
   }
 }
 
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
-  // Debug endpoint - Vercel'in gercek search engine cevaplarini gorelim
-  if (req.query.debug === '1') {
-    const q = req.query.q || 'site:instagram.com beslenme uzmani';
-    const enc = encodeURIComponent(q);
-    const results = await Promise.all([
-      debugFetch('ddg', `https://html.duckduckgo.com/html/?q=${enc}`, {
-        'User-Agent': UA,
-        'Accept-Language': 'tr-TR,tr;q=0.9',
-      }),
-      debugFetch('google', `https://www.google.com/search?q=${enc}&num=30&hl=tr&gl=tr`, {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'tr-TR,tr;q=0.9',
-        'Accept': 'text/html,application/xhtml+xml',
-      }),
-      debugFetch('yandex', `https://yandex.com.tr/search/?text=${enc}&lr=11508`, {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'tr-TR,tr;q=0.9',
-        'Referer': 'https://yandex.com.tr/',
-      }),
-      debugFetch('bing', `https://www.bing.com/search?q=${enc}&cc=tr&setlang=tr`, {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept-Language': 'tr-TR,tr;q=0.9',
-      }),
-    ]);
-    return res.json({ ok: true, query: q, results });
+  if (!BRAVE_API_KEY) {
+    return res.status(503).json({
+      ok: false,
+      error: 'BRAVE_API_KEY env var tanimlanmamis. brave.com/search/api/ uzerinden free key al, Vercel env vars\'a ekle.',
+    });
   }
 
   const supabase = getSupabase();
-  const ddgQueries = generateQueries(DDG_QUERIES_PER_RUN);
-  const googleQueries = generateQueries(GOOGLE_QUERIES_PER_RUN);
-  const yandexQueries = generateQueries(YANDEX_QUERIES_PER_RUN);
+  const queries = generateQueries(QUERIES_PER_RUN);
 
   const all = new Map();
-  const sources = { ddg: 0, google: 0, yandex: 0 };
+  const errors = [];
+  let totalResults = 0;
 
-  function merge(searchName, niche, found) {
-    sources[searchName] += found.size;
-    for (const [username, hits] of found) {
+  await Promise.all(queries.map(async (q) => {
+    const niche = nicheFromQuery(q);
+    const { usernames, count, error } = await searchBrave(q);
+    if (error) errors.push({ query: q, error });
+    if (count) totalResults += count;
+    for (const [username, hits] of usernames) {
       const prev = all.get(username) || { hits: 0, niche: null };
       all.set(username, {
         hits: prev.hits + hits,
         niche: prev.niche || niche,
       });
     }
-  }
-
-  const ddgPromises = ddgQueries.map(async (q) => {
-    merge('ddg', nicheFromQuery(q), await searchDDG(q));
-  });
-  const googlePromises = googleQueries.map(async (q) => {
-    merge('google', nicheFromQuery(q), await searchGoogle(q));
-  });
-  const yandexPromises = yandexQueries.map(async (q) => {
-    merge('yandex', nicheFromQuery(q), await searchYandex(q));
-  });
-
-  await Promise.all([...ddgPromises, ...googlePromises, ...yandexPromises]);
+  }));
 
   if (all.size === 0) {
     return res.json({
       ok: true,
-      ddg_queries: ddgQueries,
-      google_queries: googleQueries,
-      yandex_queries: yandexQueries,
-      sources,
+      queries,
+      brave_results: totalResults,
       found: 0,
       inserted: 0,
+      errors,
     });
   }
 
@@ -335,7 +194,7 @@ module.exports = async function handler(req, res) {
     newRows.push({
       username,
       niche: info.niche,
-      source: 'ddg_discover',
+      source: 'brave_discover',
     });
   }
 
@@ -351,14 +210,13 @@ module.exports = async function handler(req, res) {
 
   return res.json({
     ok: true,
-    ddg_queries: ddgQueries,
-    google_queries: googleQueries,
-    yandex_queries: yandexQueries,
-    sources,
+    queries,
+    brave_results: totalResults,
     found: all.size,
     existing: usernames.length - newRows.length,
     new_candidates: newRows.length,
     inserted,
     sample: newRows.slice(0, 10).map(r => r.username),
+    errors,
   });
 };
