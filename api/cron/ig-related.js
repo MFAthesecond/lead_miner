@@ -14,31 +14,41 @@ const DELAY_MS   = parseInt(process.env.RELATED_DELAY_MS || '2500', 10);
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function fetchProfileWithId(username) {
+async function fetchProfileWithId(username, debug) {
   const endpoints = [
     `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
     `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
   ];
+  const tries = [];
   for (const url of endpoints) {
     try {
       const r = await fetch(url, {
         headers: { 'User-Agent': IG_UA, 'X-IG-App-ID': IG_APP_ID },
         signal: AbortSignal.timeout(8000),
       });
-      if (r.status === 401 || r.status === 429) return { rateLimited: true };
-      if (r.status === 404) return { notFound: true };
+      const t = { url: url.includes('i.instagram') ? 'i' : 'www', status: r.status };
+      if (debug && !r.ok) {
+        const body = await r.text().catch(() => '');
+        t.body_snippet = body.substring(0, 200);
+      }
+      tries.push(t);
+      if (r.status === 401 || r.status === 429) return { rateLimited: true, debug: tries };
+      if (r.status === 404) return { notFound: true, debug: tries };
       if (!r.ok) continue;
       const data = await r.json();
       const u = data?.data?.user;
-      if (!u) continue;
+      if (!u) { tries[tries.length - 1].no_user = true; continue; }
       return {
         ok: true,
         id: u.id || u.pk,
         related: (u.edge_related_profiles?.edges || []).map(e => e.node).filter(Boolean),
+        debug: tries,
       };
-    } catch {}
+    } catch (e) {
+      tries.push({ url: url.includes('i.instagram') ? 'i' : 'www', error: e.message });
+    }
   }
-  return { error: true };
+  return { error: true, debug: tries };
 }
 
 async function fetchChaining(targetId) {
@@ -48,12 +58,12 @@ async function fetchChaining(targetId) {
       headers: { 'User-Agent': IG_UA, 'X-IG-App-ID': IG_APP_ID },
       signal: AbortSignal.timeout(8000),
     });
-    if (r.status === 401 || r.status === 429) return { rateLimited: true };
+    if (r.status === 401 || r.status === 429) return { rateLimited: true, status: r.status };
     if (!r.ok) return { error: true, status: r.status };
     const data = await r.json();
-    return { ok: true, users: data?.users || [] };
-  } catch {
-    return { error: true };
+    return { ok: true, status: r.status, users: data?.users || [] };
+  } catch (e) {
+    return { error: true, ex: e.message };
   }
 }
 
@@ -88,6 +98,8 @@ module.exports = async function handler(req, res) {
   const processedIds = [];
   let rateLimited = false;
   let viaWeb = 0, viaChaining = 0, errors = 0;
+  const debug = req.query?.debug === '1';
+  const debugLog = debug ? [] : null;
 
   for (const row of rows) {
     const username = extractUsername(row.username);
@@ -96,7 +108,8 @@ module.exports = async function handler(req, res) {
       continue;
     }
 
-    const profile = await fetchProfileWithId(username);
+    const profile = await fetchProfileWithId(username, debug);
+    if (debugLog) debugLog.push({ username, profile_tries: profile.debug, has_id: !!profile.id, related_count: (profile.related || []).length });
     if (profile.rateLimited) { rateLimited = true; break; }
     if (profile.error || profile.notFound) { errors++; processedIds.push(row.id); await sleep(DELAY_MS); continue; }
 
@@ -122,6 +135,7 @@ module.exports = async function handler(req, res) {
     if (profile.id) {
       await sleep(800);
       const chain = await fetchChaining(profile.id);
+      if (debugLog) debugLog[debugLog.length - 1].chain = { status: chain.status, ok: chain.ok, rate_limited: !!chain.rateLimited, users_count: (chain.users || []).length };
       if (chain.rateLimited) { rateLimited = true; processedIds.push(row.id); break; }
       if (chain.ok) {
         let chainAdded = 0;
@@ -191,5 +205,6 @@ module.exports = async function handler(req, res) {
     errors,
     rate_limited: rateLimited,
     seed_usernames: rows.map(r => r.username),
+    ...(debugLog ? { debug: debugLog } : {}),
   });
 };
