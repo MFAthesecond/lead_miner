@@ -229,8 +229,55 @@ async function searchYandex(query) {
   } catch { return new Map(); }
 }
 
+async function debugFetch(name, url, headers) {
+  try {
+    const r = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+    const html = await r.text();
+    const matches = [...html.matchAll(/instagram\.com\/([a-zA-Z0-9_.]{2,30})/gi)];
+    return {
+      engine: name,
+      status: r.status,
+      ok: r.ok,
+      html_length: html.length,
+      ig_matches: matches.length,
+      first_5: matches.slice(0, 5).map(m => m[1]),
+      has_captcha: /captcha|unusual traffic|sorry\/index|showcaptcha/i.test(html),
+      sample: html.substring(0, 200),
+    };
+  } catch (e) {
+    return { engine: name, error: e.message };
+  }
+}
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Debug endpoint - Vercel'in gercek search engine cevaplarini gorelim
+  if (req.query.debug === '1') {
+    const q = req.query.q || 'site:instagram.com beslenme uzmani';
+    const enc = encodeURIComponent(q);
+    const results = await Promise.all([
+      debugFetch('ddg', `https://html.duckduckgo.com/html/?q=${enc}`, {
+        'User-Agent': UA,
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+      }),
+      debugFetch('google', `https://www.google.com/search?q=${enc}&num=30&hl=tr&gl=tr`, {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml',
+      }),
+      debugFetch('yandex', `https://yandex.com.tr/search/?text=${enc}&lr=11508`, {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+        'Referer': 'https://yandex.com.tr/',
+      }),
+      debugFetch('bing', `https://www.bing.com/search?q=${enc}&cc=tr&setlang=tr`, {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+      }),
+    ]);
+    return res.json({ ok: true, query: q, results });
+  }
 
   const supabase = getSupabase();
   const ddgQueries = generateQueries(DDG_QUERIES_PER_RUN);
