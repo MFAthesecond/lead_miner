@@ -94,7 +94,9 @@ lead_miner/
 - `SUPABASE_KEY`
 - `CRON_SECRET` (opsiyonel)
 - `SEED_MIN_FOLLOWERS` (default: 5000) - ig-seed eşiği
-- `IG_DISCOVER_DDG_PER_RUN` (default: 2)
+- `IG_DISCOVER_DDG_PER_RUN` (default: 3)
+- `IG_DISCOVER_GOOGLE_PER_RUN` (default: 2)
+- `IG_DISCOVER_YANDEX_PER_RUN` (default: 2)
 - `IG_ENRICH_BATCH` (default: 3)
 - `IG_ENRICH_DELAY_MS` (default: 3000)
 - `IG_RESCORE_BATCH` (default: 3)

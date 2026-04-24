@@ -58,6 +58,7 @@ const TEMPLATES = [
 
 const DDG_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_DDG_PER_RUN || '3', 10);
 const GOOGLE_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_GOOGLE_PER_RUN || '2', 10);
+const YANDEX_QUERIES_PER_RUN = parseInt(process.env.IG_DISCOVER_YANDEX_PER_RUN || '2', 10);
 
 function generateQueries(count) {
   const out = new Set();
@@ -176,8 +177,21 @@ async function searchDDG(query) {
   return usernames;
 }
 
-async function searchGoogle(query) {
+function extractIgUsernamesFromHtml(html) {
   const usernames = new Map();
+  const inlineRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})(?:[\/?#"'\s]|$)/gi;
+  let m;
+  while ((m = inlineRx.exec(html)) !== null) {
+    const seg = m[1].toLowerCase();
+    if (NON_USER_PATHS.has(seg)) continue;
+    const username = extractUsername(seg);
+    if (!username) continue;
+    usernames.set(username, (usernames.get(username) || 0) + 1);
+  }
+  return usernames;
+}
+
+async function searchGoogle(query) {
   const start = Math.floor(Math.random() * 5) * 10;
   try {
     const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=30&start=${start}&hl=tr&gl=tr`;
@@ -189,20 +203,30 @@ async function searchGoogle(query) {
       },
       signal: AbortSignal.timeout(6000),
     });
-    if (!resp.ok) return usernames;
-    const html = await resp.text();
+    if (!resp.ok) return new Map();
+    return extractIgUsernamesFromHtml(await resp.text());
+  } catch { return new Map(); }
+}
 
-    const inlineRx = /instagram\.com\/([a-zA-Z0-9_.]{2,30})(?:[\/?#"'\s]|$)/gi;
-    let m;
-    while ((m = inlineRx.exec(html)) !== null) {
-      const seg = m[1].toLowerCase();
-      if (NON_USER_PATHS.has(seg)) continue;
-      const username = extractUsername(seg);
-      if (!username) continue;
-      usernames.set(username, (usernames.get(username) || 0) + 1);
-    }
-  } catch {}
-  return usernames;
+async function searchYandex(query) {
+  // Yandex Turkiye - lr=11508 Istanbul region kodu, TR sonuclari onceler
+  try {
+    const url = `https://yandex.com.tr/search/?text=${encodeURIComponent(query)}&lr=11508&numdoc=30`;
+    const resp = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept-Language': 'tr-TR,tr;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Referer': 'https://yandex.com.tr/',
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!resp.ok) return new Map();
+    const html = await resp.text();
+    // Yandex captcha sayfasini tespit et
+    if (html.includes('showcaptcha') || html.includes('captcha-page')) return new Map();
+    return extractIgUsernamesFromHtml(html);
+  } catch { return new Map(); }
 }
 
 module.exports = async function handler(req, res) {
@@ -211,43 +235,40 @@ module.exports = async function handler(req, res) {
   const supabase = getSupabase();
   const ddgQueries = generateQueries(DDG_QUERIES_PER_RUN);
   const googleQueries = generateQueries(GOOGLE_QUERIES_PER_RUN);
+  const yandexQueries = generateQueries(YANDEX_QUERIES_PER_RUN);
 
   const all = new Map();
-  const sources = { ddg: 0, google: 0 };
+  const sources = { ddg: 0, google: 0, yandex: 0 };
+
+  function merge(searchName, niche, found) {
+    sources[searchName] += found.size;
+    for (const [username, hits] of found) {
+      const prev = all.get(username) || { hits: 0, niche: null };
+      all.set(username, {
+        hits: prev.hits + hits,
+        niche: prev.niche || niche,
+      });
+    }
+  }
 
   const ddgPromises = ddgQueries.map(async (q) => {
-    const niche = nicheFromQuery(q);
-    const found = await searchDDG(q);
-    sources.ddg += found.size;
-    for (const [username, hits] of found) {
-      const prev = all.get(username) || { hits: 0, niche: null };
-      all.set(username, {
-        hits: prev.hits + hits,
-        niche: prev.niche || niche,
-      });
-    }
+    merge('ddg', nicheFromQuery(q), await searchDDG(q));
   });
-
   const googlePromises = googleQueries.map(async (q) => {
-    const niche = nicheFromQuery(q);
-    const found = await searchGoogle(q);
-    sources.google += found.size;
-    for (const [username, hits] of found) {
-      const prev = all.get(username) || { hits: 0, niche: null };
-      all.set(username, {
-        hits: prev.hits + hits,
-        niche: prev.niche || niche,
-      });
-    }
+    merge('google', nicheFromQuery(q), await searchGoogle(q));
+  });
+  const yandexPromises = yandexQueries.map(async (q) => {
+    merge('yandex', nicheFromQuery(q), await searchYandex(q));
   });
 
-  await Promise.all([...ddgPromises, ...googlePromises]);
+  await Promise.all([...ddgPromises, ...googlePromises, ...yandexPromises]);
 
   if (all.size === 0) {
     return res.json({
       ok: true,
       ddg_queries: ddgQueries,
       google_queries: googleQueries,
+      yandex_queries: yandexQueries,
       sources,
       found: 0,
       inserted: 0,
@@ -285,6 +306,7 @@ module.exports = async function handler(req, res) {
     ok: true,
     ddg_queries: ddgQueries,
     google_queries: googleQueries,
+    yandex_queries: yandexQueries,
     sources,
     found: all.size,
     existing: usernames.length - newRows.length,
