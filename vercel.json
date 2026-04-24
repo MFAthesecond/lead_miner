@@ -1,6 +1,8 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/", "destination": "/leads.html" }
+    { "source": "/", "destination": "/leads.html" },
+    { "source": "/leads", "destination": "/leads.html" },
+    { "source": "/ig", "destination": "/ig-leads.html" }
   ]
 }

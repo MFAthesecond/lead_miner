@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shopify Lead Finder</title>
+  <title>Instagram Lead Finder</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;padding:20px}
-    .container{max-width:1600px;margin:0 auto}
+    .container{max-width:1700px;margin:0 auto}
     .nav{display:flex;gap:8px;margin-bottom:14px}
     .nav a{padding:7px 14px;border-radius:8px;background:#fff;color:#5b5ea6;font-size:13px;font-weight:600;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.08)}
     .nav a.active{background:#5b5ea6;color:#fff}
@@ -21,6 +21,8 @@
     .filters input[type=text]{padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;width:200px}
     .filters select{padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:#fff}
     .filters label{font-size:12px;color:#555;cursor:pointer;display:flex;align-items:center;gap:3px;white-space:nowrap}
+    .add-btn{padding:7px 14px;background:#5b5ea6;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600}
+    .add-btn:hover{background:#4a4d95}
     #count{margin-left:auto;color:#888;font-size:12px}
     table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08)}
     th{background:#5b5ea6;color:#fff;padding:10px 12px;text-align:left;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
@@ -29,15 +31,29 @@
     th.sorted .arr{opacity:1}
     td{padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;vertical-align:middle}
     tr:hover{background:#f8f9ff}
-    tr.hp{background:#f0fff4}
-    tr.hp:hover{background:#e6ffec}
-    .nm{font-weight:600;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    tr.hot{background:#f0fff4}
+    tr.hot:hover{background:#e6ffec}
+    tr.unfetched{opacity:.7}
+    .nm{font-weight:600;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .un{font-family:Menlo,monospace;font-size:12px;color:#5b5ea6}
     a{color:#5b5ea6;text-decoration:none}
     a:hover{text-decoration:underline}
     .e{color:#ccc}
     .badge{padding:2px 7px;border-radius:4px;font-size:11px;white-space:nowrap}
-    .badge-cat{background:#eef;color:#5b5ea6}
-    .ig{text-align:right;font-variant-numeric:tabular-nums}
+    .badge-niche{background:#eef;color:#5b5ea6}
+    .badge-cat{background:#fef3e2;color:#a06b00}
+    .badge-src-seed{background:#e3f2fd;color:#1565c0}
+    .badge-src-ddg{background:#f3e5f5;color:#6a1b9a}
+    .badge-src-manual{background:#fff3e0;color:#e65100}
+    .badge-business{background:#c8e6c9;color:#2e7d32;font-size:10px}
+    .badge-private{background:#ffcdd2;color:#c62828;font-size:10px}
+    .badge-verified{background:#bbdefb;color:#0d47a1;font-size:10px}
+    .signal{display:inline-block;width:18px;height:18px;border-radius:4px;text-align:center;font-size:11px;line-height:18px;font-weight:700}
+    .signal.on{background:#28a745;color:#fff}
+    .signal.off{background:#eee;color:#bbb}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+    .score{text-align:right;font-weight:700;color:#5b5ea6;font-variant-numeric:tabular-nums}
+    .bio-cell{max-width:240px;font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .loading{text-align:center;padding:60px;color:#888;font-size:16px}
     .tag-select{padding:3px 6px;border:1px solid #ddd;border-radius:4px;font-size:11px;background:#fff;cursor:pointer;width:120px}
     .tag-select.t-ulasilamadi{background:#fff3cd;border-color:#ffc107}
@@ -53,21 +69,35 @@
     .editable{cursor:pointer;border-bottom:1px dashed transparent;transition:border-color .2s}
     .editable:hover{border-bottom-color:#5b5ea6}
     .edit-input{padding:2px 4px;border:1px solid #5b5ea6;border-radius:3px;font-size:12px;width:100%;outline:none;background:#f8f9ff}
-    .edit-ok{color:#28a745;font-size:10px;margin-left:2px}
   </style>
 </head>
 <body>
 <div class="container">
   <div class="nav">
-    <a href="/leads" class="active">Shopify Leads</a>
-    <a href="/ig">Instagram Leads</a>
+    <a href="/leads">Shopify Leads</a>
+    <a href="/ig" class="active">Instagram Leads</a>
   </div>
-  <h1>Shopify Lead Finder</h1>
-  <p class="subtitle">Erkam'in Ajansi - Otomatik guncellenir</p>
+  <h1>Instagram Lead Finder</h1>
+  <p class="subtitle">DM/Yorum otomasyon SaaS - Mesaj trafigi yuksek hesaplar</p>
   <div class="stats" id="stats"></div>
   <div class="filters">
-    <input type="text" id="search" placeholder="Magaza ara..." oninput="applyFilters()">
-    <select id="catF" onchange="applyFilters()"><option value="">Tum Kategoriler</option></select>
+    <input type="text" id="search" placeholder="Username, ad, bio ara..." oninput="applyFilters()">
+    <select id="nicheF" onchange="applyFilters()"><option value="">Tum Nisler</option></select>
+    <select id="srcF" onchange="applyFilters()">
+      <option value="">Tum Kaynaklar</option>
+      <option value="seed_shopify">Shopify Seed</option>
+      <option value="ddg_discover">DDG Kesif</option>
+      <option value="manual">Manuel</option>
+    </select>
+    <select id="folF" onchange="applyFilters()">
+      <option value="">Tum Takipci</option>
+      <option value="0-1000">0 - 1K</option>
+      <option value="1000-10000">1K - 10K</option>
+      <option value="10000-50000">10K - 50K</option>
+      <option value="50000-100000">50K - 100K</option>
+      <option value="100000-1000000">100K - 1M</option>
+      <option value="1000000-9999999999">1M+</option>
+    </select>
     <select id="tagF" onchange="applyFilters()">
       <option value="">Tum Durumlar</option>
       <option value="Ulasilamadi">Ulasilamadi</option>
@@ -81,9 +111,12 @@
       <option value="Reddetti">Reddetti</option>
       <option value="_none">Durumu Yok</option>
     </select>
-    <label><input type="checkbox" id="fPhone" onchange="applyFilters()"> Telefonlu</label>
+    <label><input type="checkbox" id="fDm" onchange="applyFilters()"> DM Sinyali</label>
     <label><input type="checkbox" id="fWa" onchange="applyFilters()"> WhatsApp</label>
-    <label><input type="checkbox" id="fIg" onchange="applyFilters()"> Instagram</label>
+    <label><input type="checkbox" id="fWeb" onchange="applyFilters()"> Website</label>
+    <label><input type="checkbox" id="fBiz" onchange="applyFilters()"> Business</label>
+    <label><input type="checkbox" id="fEnriched" onchange="applyFilters()"> Sadece Enrich Edilmis</label>
+    <button class="add-btn" onclick="addManual()">+ Username Ekle</button>
     <span id="count"></span>
   </div>
   <div id="tableWrap"><div class="loading">Yukleniyor...</div></div>
@@ -117,35 +150,48 @@ const TAG_CLASS = {
   'Reddetti':'t-reddetti',
 };
 
+const SRC_CLASS = {
+  'seed_shopify':'badge-src-seed',
+  'ddg_discover':'badge-src-ddg',
+  'manual':'badge-src-manual',
+};
+const SRC_LABEL = {
+  'seed_shopify':'Shopify',
+  'ddg_discover':'DDG',
+  'manual':'Manuel',
+};
+
 async function load(){
   try{
-    const r=await fetch('/api/leads');
+    const r=await fetch('/api/ig-leads');
     const json=await r.json();
     DATA = json.rows || json;
   }catch(e){
     document.getElementById('tableWrap').innerHTML='<div class="loading">Veri yuklenemedi</div>';
     return;
   }
-  const cats=new Set(DATA.filter(d=>d.category).map(d=>d.category));
-  const sel=document.getElementById('catF');
-  [...cats].sort().forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
+  const niches=new Set(DATA.filter(d=>d.niche).map(d=>d.niche));
+  const sel=document.getElementById('nicheF');
+  [...niches].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;sel.appendChild(o)});
   renderStats();
   renderTable();
 }
 
 function renderStats(){
   const t=DATA.length;
-  const ph=DATA.filter(d=>d.phones&&d.phones.length).length;
-  const wa=DATA.filter(d=>d.whatsapp).length;
-  const ig=DATA.filter(d=>d.instagram).length;
-  const em=DATA.filter(d=>d.emails&&d.emails.length).length;
+  const enriched=DATA.filter(d=>d.ig_fetched_at).length;
+  const dm=DATA.filter(d=>d.has_dm_signal).length;
+  const wa=DATA.filter(d=>d.has_wa_signal).length;
+  const web=DATA.filter(d=>d.has_website).length;
+  const biz=DATA.filter(d=>d.is_business).length;
   const tagged=DATA.filter(d=>d.tag).length;
   document.getElementById('stats').innerHTML=
-    `<div class="stat"><div class="n">${t}</div><div class="l">Magaza</div></div>`+
-    `<div class="stat"><div class="n">${ph}</div><div class="l">Telefon</div></div>`+
+    `<div class="stat"><div class="n">${t}</div><div class="l">Toplam</div></div>`+
+    `<div class="stat"><div class="n">${enriched}</div><div class="l">Enrich Edilmis</div></div>`+
+    `<div class="stat"><div class="n">${dm}</div><div class="l">DM Sinyali</div></div>`+
     `<div class="stat"><div class="n">${wa}</div><div class="l">WhatsApp</div></div>`+
-    `<div class="stat"><div class="n">${em}</div><div class="l">Email</div></div>`+
-    `<div class="stat"><div class="n">${ig}</div><div class="l">Instagram</div></div>`+
+    `<div class="stat"><div class="n">${web}</div><div class="l">Website</div></div>`+
+    `<div class="stat"><div class="n">${biz}</div><div class="l">Business</div></div>`+
     `<div class="stat"><div class="n">${tagged}</div><div class="l">Taglenmis</div></div>`;
 }
 
@@ -160,7 +206,7 @@ function tagSelect(d){
 async function setTag(id, tag, el){
   el.disabled=true;
   try{
-    await fetch('/api/leads',{
+    await fetch('/api/ig-leads',{
       method:'PATCH',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id, tag: tag||null})
@@ -175,38 +221,66 @@ async function setTag(id, tag, el){
   el.disabled=false;
 }
 
+function fmtNum(n){
+  if(!n) return '-';
+  if(n>=1000000) return (n/1000000).toFixed(1)+'M';
+  if(n>=1000) return (n/1000).toFixed(1)+'K';
+  return String(n);
+}
+
+function signalBadge(on){
+  return `<span class="signal ${on?'on':'off'}">${on?'\u2713':'\u00b7'}</span>`;
+}
+
 function renderTable(){
   const filtered=getFiltered();
   document.getElementById('count').textContent=`${filtered.length} / ${DATA.length}`;
 
-  const cols=['#','Magaza','Telefon','WhatsApp','Email','Instagram','Takipci','Site','Kategori','Durum','Not','Urun'];
+  const cols=['#','Username','Ad','Skor','Takipci','Post','Niche','Kategori','Bio','DM','WA','Web','Email','Telefon','Web Sitesi','Shopify','Kaynak','Durum','Not'];
   const ths=cols.map((h,i)=>`<th onclick="doSort(${i})"${sortCol===i?' class="sorted"':''}>${h} <span class="arr">${sortCol===i?(sortDir==='asc'?'\u25B2':'\u25BC'):'\u25B2'}</span></th>`).join('');
 
   let rows='';
   filtered.forEach((d,i)=>{
-    const phone=d.phones&&d.phones[0]||'';
-    const wa=d.whatsapp||'';
-    const email=(d.emails&&d.emails[0])||'';
-    const igUser=d.instagram?d.instagram.replace('https://instagram.com/','@'):'';
-    const igLink=d.instagram||'';
-    const igF=d.ig_followers||0;
-    const igDisp=igF?igF.toLocaleString('tr-TR'):'-';
-    const hp=phone||wa?'hp':'';
-    const cat=d.category||'';
+    const hot=(d.has_dm_signal||d.has_wa_signal)?'hot':'';
+    const unf=!d.ig_fetched_at?'unfetched':'';
+    const cls=[hot,unf].filter(Boolean).join(' ');
 
-    rows+=`<tr class="${hp}">
+    const igLink=`https://instagram.com/${d.username}`;
+    const niche=d.niche||'';
+    const cat=d.category||'';
+    const bio=d.bio||'';
+    const email=d.business_email||'';
+    const phone=d.business_phone||d.whatsapp||'';
+    const wa=d.whatsapp||d.business_phone||'';
+    const ext=d.external_url||'';
+    const sho=d.shopify_url||'';
+    const src=d.source||'';
+
+    const badges=[];
+    if(d.is_business) badges.push('<span class="badge badge-business">B</span>');
+    if(d.is_verified) badges.push('<span class="badge badge-verified">\u2713</span>');
+    if(d.is_private) badges.push('<span class="badge badge-private">P</span>');
+
+    rows+=`<tr class="${cls}">
       <td>${i+1}</td>
-      <td class="nm">${d.store_name||d.domain||''}</td>
-      <td class="editable" onclick="editCell(${d.id},'phones','${esc(phone)}')">${phone?`<a href="tel:${phone}" onclick="event.stopPropagation()">${phone}</a>`:'<span class="e">-</span>'}</td>
-      <td class="editable" onclick="editCell(${d.id},'whatsapp','${esc(wa)}')">${wa?`<a href="https://wa.me/${wa}" target="_blank" onclick="event.stopPropagation()">${wa}</a>`:'<span class="e">-</span>'}</td>
-      <td class="editable" onclick="editCell(${d.id},'emails','${esc(email)}')">${email?`<a href="mailto:${email}" onclick="event.stopPropagation()">${email}</a>`:'<span class="e">-</span>'}</td>
-      <td class="editable" onclick="editCell(${d.id},'instagram','${esc(igUser.replace('@',''))}')">${igUser?`<a href="${igLink}" target="_blank" onclick="event.stopPropagation()">${igUser}</a>`:'<span class="e">-</span>'}</td>
-      <td class="ig">${igDisp}</td>
-      <td><a href="${d.url}" target="_blank">Ac</a></td>
+      <td><a href="${igLink}" target="_blank" class="un">@${d.username}</a> ${badges.join('')}</td>
+      <td class="nm">${esc(d.full_name||'')||'<span class="e">-</span>'}</td>
+      <td class="score">${d.lite_score||0}</td>
+      <td class="num">${fmtNum(d.followers)}</td>
+      <td class="num">${fmtNum(d.post_count)}</td>
+      <td class="editable" onclick="editCell(${d.id},'niche','${esc(niche)}')">${niche?`<span class="badge badge-niche">${niche}</span>`:'<span class="e">-</span>'}</td>
       <td class="editable" onclick="editCell(${d.id},'category','${esc(cat)}')">${cat?`<span class="badge badge-cat">${cat}</span>`:'<span class="e">-</span>'}</td>
+      <td class="bio-cell" title="${esc(bio)}">${bio||'<span class="e">-</span>'}</td>
+      <td>${signalBadge(d.has_dm_signal)}</td>
+      <td>${signalBadge(d.has_wa_signal)}</td>
+      <td>${signalBadge(d.has_website)}</td>
+      <td class="editable" onclick="editCell(${d.id},'business_email','${esc(email)}')">${email?`<a href="mailto:${email}" onclick="event.stopPropagation()">${email}</a>`:'<span class="e">-</span>'}</td>
+      <td class="editable" onclick="editCell(${d.id},'business_phone','${esc(phone)}')">${phone?`<a href="tel:${phone}" onclick="event.stopPropagation()">${phone}</a>`:'<span class="e">-</span>'}</td>
+      <td>${ext?`<a href="${ext}" target="_blank">Ac</a>`:'<span class="e">-</span>'}</td>
+      <td>${sho?`<a href="${sho}" target="_blank">Sho</a>`:'<span class="e">-</span>'}</td>
+      <td>${src?`<span class="badge ${SRC_CLASS[src]||''}">${SRC_LABEL[src]||src}</span>`:'<span class="e">-</span>'}</td>
       <td>${tagSelect(d)}</td>
       <td class="note-cell editable" onclick="editCell(${d.id},'notes','${esc(d.notes||'')}')" title="${esc(d.notes||'')}">${d.notes||'<span class="e">-</span>'}</td>
-      <td>${d.product_count||'-'}</td>
     </tr>`;
   });
 
@@ -215,27 +289,38 @@ function renderTable(){
 
 function getFiltered(){
   const q=document.getElementById('search').value.toLowerCase();
-  const cat=document.getElementById('catF').value;
+  const niche=document.getElementById('nicheF').value;
+  const src=document.getElementById('srcF').value;
+  const fol=document.getElementById('folF').value;
   const tagFilter=document.getElementById('tagF').value;
-  const fP=document.getElementById('fPhone').checked;
-  const fW=document.getElementById('fWa').checked;
-  const fI=document.getElementById('fIg').checked;
+  const fDm=document.getElementById('fDm').checked;
+  const fWa=document.getElementById('fWa').checked;
+  const fWeb=document.getElementById('fWeb').checked;
+  const fBiz=document.getElementById('fBiz').checked;
+  const fEnr=document.getElementById('fEnriched').checked;
 
   let arr=DATA.filter(d=>{
     if(q){
-      const txt=`${d.store_name||''} ${d.domain||''} ${d.category||''} ${(d.emails||[]).join(' ')} ${d.tag||''}`.toLowerCase();
+      const txt=`${d.username||''} ${d.full_name||''} ${d.bio||''} ${d.niche||''} ${d.category||''}`.toLowerCase();
       if(!txt.includes(q))return false;
     }
-    if(cat&&d.category!==cat)return false;
+    if(niche&&d.niche!==niche)return false;
+    if(src&&d.source!==src)return false;
+    if(fol){
+      const [lo,hi]=fol.split('-').map(Number);
+      const f=d.followers||0;
+      if(f<lo||f>hi)return false;
+    }
     if(tagFilter==='_none'&&d.tag)return false;
     if(tagFilter&&tagFilter!=='_none'&&d.tag!==tagFilter)return false;
-    if(fP&&(!d.phones||!d.phones.length))return false;
-    if(fW&&!d.whatsapp)return false;
-    if(fI&&!d.instagram)return false;
+    if(fDm&&!d.has_dm_signal)return false;
+    if(fWa&&!d.has_wa_signal)return false;
+    if(fWeb&&!d.has_website)return false;
+    if(fBiz&&!d.is_business)return false;
+    if(fEnr&&!d.ig_fetched_at)return false;
     return true;
   });
 
-  // Taglenenler her zaman uste
   const TAG_ORDER = {'Musteri':1,'Toplanti Alindi':2,'Ilgileniyor':3,'Mail Iletildi':4,'Tekrar Aranacak':5,'Mesgul':6,'Ulasilamadi':7,'Numara Yanlis':8,'Reddetti':9};
   arr.sort((a,b)=>{
     const ta = a.tag ? (TAG_ORDER[a.tag]||7) : 99;
@@ -253,11 +338,12 @@ function getFiltered(){
 }
 
 function sortData(arr){
-  const key=[null,'store_name',null,null,null,null,'ig_followers',null,'category','tag','notes','product_count'][sortCol];
+  const key=[null,'username','full_name','lite_score','followers','post_count','niche','category',null,null,null,null,null,null,null,null,null,'tag','notes'][sortCol];
   if(!key)return arr;
+  const numKeys=new Set(['lite_score','followers','post_count']);
   return arr.slice().sort((a,b)=>{
     let va=a[key]??'', vb=b[key]??'';
-    if(typeof va==='number'||key==='ig_followers'||key==='product_count'){
+    if(numKeys.has(key)){
       va=Number(va)||0; vb=Number(vb)||0;
       return sortDir==='asc'?va-vb:vb-va;
     }
@@ -280,7 +366,6 @@ function editCell(id, field, current){
   const input=document.createElement('input');
   input.className='edit-input';
   input.value=current;
-  input.placeholder=field==='phones'?'05xx xxx xxxx':field==='emails'?'email@ornek.com':field==='whatsapp'?'905xxxxxxxxx':field==='instagram'?'kullanici_adi':field==='category'?'Kategori':'';
   td.innerHTML='';
   td.appendChild(input);
   input.focus();
@@ -288,22 +373,14 @@ function editCell(id, field, current){
 
   async function save(){
     const val=input.value.trim();
-    let body={id};
-    if(field==='phones') body.phones=val?[val]:[];
-    else if(field==='emails') body.emails=val?[val]:[];
-    else if(field==='instagram') body.instagram=val?'https://instagram.com/'+val.replace('@','').replace('https://instagram.com/',''):'';
-    else body[field]=val;
+    const body={id};
+    body[field]=val;
 
     try{
-      const r=await fetch('/api/leads',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const r=await fetch('/api/ig-leads',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
       if(!r.ok) throw new Error('API hata');
       const item=DATA.find(d=>d.id===id);
-      if(item){
-        if(field==='phones') item.phones=val?[val]:[];
-        else if(field==='emails') item.emails=val?[val]:[];
-        else if(field==='instagram') item.instagram=val?'https://instagram.com/'+val.replace('@','').replace('https://instagram.com/',''):null;
-        else item[field]=val||null;
-      }
+      if(item) item[field]=val||null;
       renderStats();
       renderTable();
     }catch(e){alert('Hata: '+e.message);renderTable();}
@@ -314,6 +391,23 @@ function editCell(id, field, current){
     if(e.key==='Escape') renderTable();
   });
   input.addEventListener('blur',save);
+}
+
+async function addManual(){
+  const username=prompt('Instagram username (ornek: bilkayozdemir):');
+  if(!username) return;
+  const niche=prompt('Niche (ornek: butik) - bos birakabilirsin:') || null;
+  try{
+    const r=await fetch('/api/ig-leads',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username, niche})
+    });
+    const json=await r.json();
+    if(!r.ok) throw new Error(json.error||'API hata');
+    alert('Eklendi: @'+(json.lead?.username||username)+'\nEnrich cron 15dk icinde calisir.');
+    load();
+  }catch(e){alert('Hata: '+e.message);}
 }
 
 function applyFilters(){renderTable()}
