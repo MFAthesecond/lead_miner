@@ -1,8 +1,32 @@
 // Instagram lead mining icin paylasilan yardimcilar.
 // Tek bir API havuzunu yonetiriz: rate limit dostu olmak sart.
+//
+// IG'nin yeni bot kontrolu: Sec-Fetch-* header'larini denetliyor.
+// Mobile UA + bos Sec-Fetch = "SecFetch Policy violation" 400 doner.
+// Cozum: IG web sayfasinin XHR fetch'iyle birebir ayni header set.
 
-const IG_UA = 'Instagram 275.0.0.27.98 Android (33/13; 420dpi; 1080x2400; samsung; SM-G991B; o1s; exynos2100; en_US; 458229258)';
+const IG_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const IG_APP_ID = '936619743392459';
+
+function igHeaders(username) {
+  const h = {
+    'User-Agent': IG_UA,
+    'Accept': '*/*',
+    'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+    'X-IG-App-ID': IG_APP_ID,
+    'X-ASBD-ID': '198387',
+    'X-IG-WWW-Claim': '0',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
+    'Origin': 'https://www.instagram.com',
+    'Referer': username
+      ? `https://www.instagram.com/${username}/`
+      : 'https://www.instagram.com/',
+  };
+  return h;
+}
 
 const JUNK_IG_USERS = new Set([
   'shopify','instagram','facebook','twitter','tiktok','meta','threads',
@@ -61,15 +85,15 @@ function calcLiteScore({ followers, has_dm_signal, has_wa_signal, has_website, i
 }
 
 async function fetchProfile(username) {
+  // www.instagram.com'a same-origin gibi gidiyoruz (i.instagram.com same-origin degil).
   const endpoints = [
-    `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
     `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
   ];
 
   for (const url of endpoints) {
     try {
       const resp = await fetch(url, {
-        headers: { 'User-Agent': IG_UA, 'X-IG-App-ID': IG_APP_ID },
+        headers: igHeaders(username),
         signal: AbortSignal.timeout(8000),
       });
       if (resp.status === 401 || resp.status === 429) {
@@ -144,6 +168,7 @@ function buildEnrichedRow(profile, base = {}) {
 module.exports = {
   IG_UA,
   IG_APP_ID,
+  igHeaders,
   JUNK_IG_USERS,
   extractUsername,
   detectBioSignals,

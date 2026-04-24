@@ -1,5 +1,5 @@
 const { getSupabase, verifyCron } = require('../_lib/supabase');
-const { extractUsername, JUNK_IG_USERS, IG_UA, IG_APP_ID, calcLiteScore } = require('../_lib/ig');
+const { extractUsername, JUNK_IG_USERS, igHeaders, calcLiteScore } = require('../_lib/ig');
 
 // Mevcut instagram_leads kayitlari icin "related profiles" cek.
 // IG'nin kendi onerdigi (genelde benzer sektor + ayni dil) hesaplari ekler.
@@ -15,51 +15,49 @@ const DELAY_MS   = parseInt(process.env.RELATED_DELAY_MS || '2500', 10);
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 async function fetchProfileWithId(username, debug) {
-  const endpoints = [
-    `https://i.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
-    `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`,
-  ];
+  const url = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${username}`;
   const tries = [];
-  for (const url of endpoints) {
-    try {
-      const r = await fetch(url, {
-        headers: { 'User-Agent': IG_UA, 'X-IG-App-ID': IG_APP_ID },
-        signal: AbortSignal.timeout(8000),
-      });
-      const t = { url: url.includes('i.instagram') ? 'i' : 'www', status: r.status };
-      if (debug && !r.ok) {
-        const body = await r.text().catch(() => '');
-        t.body_snippet = body.substring(0, 200);
-      }
-      tries.push(t);
-      if (r.status === 401 || r.status === 429) return { rateLimited: true, debug: tries };
-      if (r.status === 404) return { notFound: true, debug: tries };
-      if (!r.ok) continue;
-      const data = await r.json();
-      const u = data?.data?.user;
-      if (!u) { tries[tries.length - 1].no_user = true; continue; }
-      return {
-        ok: true,
-        id: u.id || u.pk,
-        related: (u.edge_related_profiles?.edges || []).map(e => e.node).filter(Boolean),
-        debug: tries,
-      };
-    } catch (e) {
-      tries.push({ url: url.includes('i.instagram') ? 'i' : 'www', error: e.message });
-    }
-  }
-  return { error: true, debug: tries };
-}
-
-async function fetchChaining(targetId) {
-  const url = `https://i.instagram.com/api/v1/discover/chaining/?target_id=${targetId}&include_chaining=true`;
   try {
     const r = await fetch(url, {
-      headers: { 'User-Agent': IG_UA, 'X-IG-App-ID': IG_APP_ID },
+      headers: igHeaders(username),
       signal: AbortSignal.timeout(8000),
     });
-    if (r.status === 401 || r.status === 429) return { rateLimited: true, status: r.status };
-    if (!r.ok) return { error: true, status: r.status };
+    const t = { status: r.status };
+    if (debug && !r.ok) {
+      const body = await r.text().catch(() => '');
+      t.body_snippet = body.substring(0, 200);
+    }
+    tries.push(t);
+    if (r.status === 401 || r.status === 429) return { rateLimited: true, debug: tries };
+    if (r.status === 404) return { notFound: true, debug: tries };
+    if (!r.ok) return { error: true, debug: tries };
+    const data = await r.json();
+    const u = data?.data?.user;
+    if (!u) { tries[0].no_user = true; return { error: true, debug: tries }; }
+    return {
+      ok: true,
+      id: u.id || u.pk,
+      related: (u.edge_related_profiles?.edges || []).map(e => e.node).filter(Boolean),
+      debug: tries,
+    };
+  } catch (e) {
+    tries.push({ error: e.message });
+    return { error: true, debug: tries };
+  }
+}
+
+async function fetchChaining(targetId, sourceUsername) {
+  // www.instagram.com same-origin olarak cagiriyoruz.
+  const url = `https://www.instagram.com/api/v1/discover/chaining/?target_id=${targetId}&include_chaining=true`;
+  try {
+    const r = await fetch(url, {
+      headers: igHeaders(sourceUsername),
+      signal: AbortSignal.timeout(8000),
+    });
+    let bodySnippet = null;
+    if (!r.ok) bodySnippet = (await r.text().catch(() => '')).substring(0, 200);
+    if (r.status === 401 || r.status === 429) return { rateLimited: true, status: r.status, body_snippet: bodySnippet };
+    if (!r.ok) return { error: true, status: r.status, body_snippet: bodySnippet };
     const data = await r.json();
     return { ok: true, status: r.status, users: data?.users || [] };
   } catch (e) {
@@ -134,8 +132,8 @@ module.exports = async function handler(req, res) {
     // 2) chaining (her zaman dene; web related cogu zaman bos olur)
     if (profile.id) {
       await sleep(800);
-      const chain = await fetchChaining(profile.id);
-      if (debugLog) debugLog[debugLog.length - 1].chain = { status: chain.status, ok: chain.ok, rate_limited: !!chain.rateLimited, users_count: (chain.users || []).length };
+      const chain = await fetchChaining(profile.id, username);
+      if (debugLog) debugLog[debugLog.length - 1].chain = { status: chain.status, ok: chain.ok, rate_limited: !!chain.rateLimited, users_count: (chain.users || []).length, body_snippet: chain.body_snippet };
       if (chain.rateLimited) { rateLimited = true; processedIds.push(row.id); break; }
       if (chain.ok) {
         let chainAdded = 0;
