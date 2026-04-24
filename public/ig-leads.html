@@ -86,6 +86,10 @@
     <select id="srcF" onchange="applyFilters()">
       <option value="">Tum Kaynaklar</option>
       <option value="seed_shopify">Shopify Seed</option>
+      <option value="seed_tsoft">Tsoft Seed</option>
+      <option value="seed_ticimax">Ticimax Seed</option>
+      <option value="seed_ideasoft">IdeaSoft Seed</option>
+      <option value="related">IG Related</option>
       <option value="brave_discover">Brave Kesif</option>
       <option value="ddg_discover">DDG Kesif (eski)</option>
       <option value="manual">Manuel</option>
@@ -153,12 +157,20 @@ const TAG_CLASS = {
 
 const SRC_CLASS = {
   'seed_shopify':'badge-src-seed',
+  'seed_tsoft':'badge-src-seed',
+  'seed_ticimax':'badge-src-seed',
+  'seed_ideasoft':'badge-src-seed',
+  'related':'badge-src-ddg',
   'brave_discover':'badge-src-ddg',
   'ddg_discover':'badge-src-ddg',
   'manual':'badge-src-manual',
 };
 const SRC_LABEL = {
   'seed_shopify':'Shopify',
+  'seed_tsoft':'Tsoft',
+  'seed_ticimax':'Ticimax',
+  'seed_ideasoft':'IdeaSoft',
+  'related':'Related',
   'brave_discover':'Brave',
   'ddg_discover':'DDG',
   'manual':'Manuel',

@@ -18,17 +18,26 @@
 
 ## Veritabanı
 
-### Tablo 1: `shopify_stores` (Shopify Lead Finder)
+### Tablo 1: `shopify_stores` (Lead havuzu - Shopify olmayanlar dahil)
 
-Kolonlar: `id, url, domain, store_name, emails (text[]), phones (text[]), instagram, ig_followers (int), whatsapp, facebook, tiktok, category, currency, product_count, description, is_shopify (bool), tag (text), notes (text), discovered_at, enriched_at, ig_fetched_at, created_at`
+Kolonlar: `id, url, domain, store_name, emails (text[]), phones (text[]), instagram, ig_followers (int), whatsapp, facebook, tiktok, category, currency, product_count, description, is_shopify (bool), source (text), tag (text), notes (text), discovered_at, enriched_at, ig_fetched_at, created_at`
+
+`source` değerleri: `storeleads` (default - Shopify magazasi), `tsoft`, `ticimax`, `ideasoft`, `manual`
+
+`is_shopify=false` ise Tsoft/Ticimax gibi non-Shopify e-ticaret platformu mağazası demek.
 
 Tag değerleri: `Ulasilamadi, Tekrar Aranacak, Numara Yanlis, Mail Iletildi, Mesgul, Toplanti Alindi, Ilgileniyor, Musteri, Reddetti`
 
 ### Tablo 2: `instagram_leads` (Instagram Lead Finder)
 
-Kolonlar: `id, username (UNIQUE), full_name, bio, external_url, business_email, business_phone, whatsapp, followers (int), following (int), post_count (int), is_business (bool), is_private (bool), is_verified (bool), category, niche, has_dm_signal (bool), has_wa_signal (bool), has_website (bool), lite_score (int), shopify_url, source, tag, notes, discovered_at, ig_fetched_at, enrich_failed_at`
+Kolonlar: `id, username (UNIQUE), full_name, bio, external_url, business_email, business_phone, whatsapp, followers (int), following (int), post_count (int), is_business (bool), is_private (bool), is_verified (bool), category, niche, has_dm_signal (bool), has_wa_signal (bool), has_website (bool), lite_score (int), shopify_url, source, tag, notes, discovered_at, ig_fetched_at, enrich_failed_at, related_fetched_at`
 
-`source` değerleri: `seed_shopify` (shopify_stores'tan kopyalanmış), `ddg_discover` (DDG ile keşfedilmiş), `manual` (panel üzerinden eklenmiş)
+`source` değerleri:
+- `seed_shopify`: shopify_stores'tan (storeleads kaynaklı) kopyalanmış
+- `seed_tsoft`, `seed_ticimax`, `seed_ideasoft`: shopify_stores'tan (non-shopify panel) kopyalanmış
+- `related`: ig-related cron'unun IG "önerilen profiller"den keşfettiği
+- `manual`: panel üzerinden eklenmiş
+- `ddg_discover`, `brave_discover`: eski (artık aktif değil)
 
 `tag` değerleri shopify_stores ile aynı.
 
@@ -41,13 +50,15 @@ lead_miner/
       supabase.js              # Shared: Supabase client, CRON_SECRET, BIG_BRANDS, isBigBrand, domainFromUrl
       ig.js                    # Shared: IG_UA, extractUsername, detectBioSignals, calcLiteScore, fetchProfile, buildEnrichedRow
     cron/
-      discover.js              # Shopify: yeni mağaza bulma
-      enrich.js                # Shopify: iletişim bilgisi çekme + snowball
+      discover.js              # Shopify: storeleads.app'ten yeni Shopify mağaza bulma
+      enrich.js                # Shopify: iletişim bilgisi çekme + snowball (TÜM domainleri scrape eder, sadece shopify değil)
       instagram.js             # Shopify: IG takipçi sayısı (DEVRE DIŞI - cron-job.org'da kapalı)
-      ig-seed.js               # IG: shopify_stores'tan 5K+ takipçili IG'leri kopyala (sıfır IG API)
-      ig-discover.js           # IG: Brave Search API ile yeni IG username keşfi (sıfır IG API, BRAVE_API_KEY gerektirir)
+      tr-extra-domains.js      # Lead havuzu: Tsoft + Ticimax referans sayfalarindan domain çek (sıfır IG API, sıfır search engine)
+      ig-seed.js               # IG: shopify_stores'tan TÜM IG'leri instagram_leads'e kopyala (sıfır IG API)
+      ig-related.js            # IG: mevcut IG hesaplari için "related/chaining" → yeni Türk IG keşfi (~5-15 yeni/seed)
       ig-enrich.js             # IG: web_profile_info ile bio + business contact + skor (batch=3, delay=3s)
       ig-rescore.js            # IG: 30 günden eski cache yenileme (haftalık)
+      ig-discover.js           # IG: Brave Search API (DEVRE DIŞI - artık kullanmıyoruz)
     leads.js                   # Shopify: GET filtreli, PATCH tag/notes
     ig-leads.js                # IG: GET filtreli, PATCH tag/notes, POST manuel ekleme
     cleanup.js                 # Shopify: çöp temizleme endpoint'i
@@ -71,15 +82,19 @@ lead_miner/
 | Enrich | /api/cron/enrich | */1 * * * * | 5 site |
 | Instagram (eski) | /api/cron/instagram | DEVRE DIŞI | - |
 
-### Instagram Lead Pipeline (YENİ)
+### Instagram Lead Pipeline
 | Job | URL | Schedule | Batch | IG API |
 |---|---|---|---|---|
-| IG Seed | /api/cron/ig-seed | 0 3 * * * (günde 1) | tüm 5K+ IG'ler | 0 |
-| IG Discover | /api/cron/ig-discover | */30 * * * * | 1 Brave sorgusu (~20 sonuç) | 0 |
+| TR Extra Domains | /api/cron/tr-extra-domains | 0 5 * * * (günde 1) | Tsoft + Ticimax referansları | 0 |
+| IG Seed | /api/cron/ig-seed | 0 3 * * * (günde 1) | shopify_stores'tan TÜM IG'ler | 0 |
+| IG Related | /api/cron/ig-related | */20 * * * * | 5 seed → ~50-200 yeni username/saat | 5 fetch + 5 chain = ~30/saat |
 | IG Enrich | /api/cron/ig-enrich | */15 * * * * | 3 hesap, 3sn delay | ~12/saat |
 | IG Rescore | /api/cron/ig-rescore | 0 4 * * 0 (haftalık) | 3 hesap | düşük |
 
-**Önemli**: Eski `instagram.js` cron'u DEVRE DIŞI, IG API havuzunu sadece `ig-enrich` ve `ig-rescore` kullanır → rate limit çakışması yok.
+**Önemli**:
+- Eski `instagram.js` ve `ig-discover.js` cron'ları DEVRE DIŞI bırakıldı (cron-job.org'da kapatın).
+- IG API kullanan tek cron'lar: `ig-related`, `ig-enrich`, `ig-rescore`. Toplam ~50/saat → güvenli.
+- DDG/Google/Yandex/Bing/Brave HİÇ KULLANMIYORUZ - hepsi datacenter IP'sini blokluyor. Eski `discover.js` (Shopify) zaten DDG kullanmıyordu, `storeleads.app` kullanıyordu (bot detection yok).
 
 ## Önemli Kısıtlar
 
@@ -93,15 +108,15 @@ lead_miner/
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 - `CRON_SECRET` (opsiyonel)
-- `SEED_MIN_FOLLOWERS` (default: 5000) - ig-seed eşiği
-- `BRAVE_API_KEY` (zorunlu - ig-discover için) - brave.com/search/api free 2000 sorgu/ay
-- `IG_DISCOVER_QUERIES_PER_RUN` (default: 1) - 30dk × 1 sorgu = 1440/ay (free quota altında)
-- `IG_DISCOVER_RESULTS_PER_QUERY` (default: 20)
+- `SEED_MIN_FOLLOWERS` (default: 0) - ig-seed eşiği. 0 = TÜM IG'leri al
+- `RELATED_BATCH_SIZE` (default: 5) - ig-related cron'unda her seferde işlenecek seed
+- `RELATED_DELAY_MS` (default: 2500) - seed'ler arası bekleme
 - `IG_ENRICH_BATCH` (default: 3)
 - `IG_ENRICH_DELAY_MS` (default: 3000)
 - `IG_RESCORE_BATCH` (default: 3)
 - `IG_RESCORE_DELAY_MS` (default: 3000)
 - `IG_CACHE_TTL_DAYS` (default: 30)
+- `BRAVE_API_KEY` (DEVRE DIŞI - ig-discover artık kullanılmıyor)
 
 ## Lite Score Formülü
 
@@ -125,14 +140,20 @@ Max ~100 puan.
 3. **Dashboard** `/leads` - sadece `enriched_at IS NOT NULL` ve `is_shopify=true` olanları gösterir
 
 ### Instagram
-1. **IG Seed** günde 1 kez `shopify_stores`'tan 5K+ takipçili IG'leri `instagram_leads`'e kopyalar (UPSERT)
-2. **IG Discover** her 30dk DDG'de `site:instagram.com {nis} {sehir}` arar, yeni username'leri ekler
-3. **IG Enrich** her 15dk `ig_fetched_at IS NULL` olanlardan 3 tanesini alır, bio + business contact + lite skor çeker
-4. **IG Rescore** haftada 1 kez 30 günden eski cache'leri yeniler
-5. **Dashboard** `/ig` - filtreler: niche, source, takipçi aralığı, DM/WA/Web sinyalleri, tag
+1. **TR Extra Domains** günde 1: Tsoft + Ticimax referans sayfalarından TR mağaza domain'leri çekip `shopify_stores`'a `is_shopify=false, source='tsoft'/'ticimax'` ile yazar
+2. **Enrich** (mevcut Shopify pipeline) bu non-shopify mağazaların sitesinden footer'dan IG/email/wa çıkarır
+3. **IG Seed** günde 1 kez `shopify_stores`'tan TÜM IG'leri (kaynak ne olursa olsun) `instagram_leads`'e kopyalar (UPSERT)
+4. **IG Related** her 20dk: instagram_leads'teki en yüksek takipçili 5 hesabı seed olarak alır, IG'nin "edge_related_profiles" + "discover/chaining" endpoint'lerinden 5-15 yeni Türk IG keşfeder, instagram_leads'e ekler. EN BÜYÜK keşif kanalı.
+5. **IG Enrich** her 15dk `ig_fetched_at IS NULL` olanlardan 3 tanesini alır, bio + business contact + lite skor çeker
+6. **IG Rescore** haftada 1 kez 30 günden eski cache'leri yeniler
+7. **Dashboard** `/ig` - filtreler: niche, source, takipçi aralığı, DM/WA/Web sinyalleri, tag
 
-## Niş Listesi (ig-discover içinde)
+## Neden Search Engine Scraping Çalışmıyor
 
-butik, kuaför, kafe, restoran, pastane, klinik, estetik, kurs, oto galeri, emlak, food blogger, beauty blogger, lifestyle blogger, el yapımı, handmade, takı, gelinlik, tesettür, nail artist, kaş kirpik, pet shop, fizyoterapi, psikolog, diyetisyen, fotografçı, organizasyon, vs. (~50 niş)
+DDG/Google/Yandex/Bing/Brave (free tier) hepsi datacenter IP'lerini (Vercel + AWS + Cursor Cloud) blokluyor:
+- DDG: 202 + CAPTCHA ("select all squares with a duck")
+- Google: 200 ama no-JS sentinel page ("Please enable JavaScript")
+- Yandex: 200 ama CAPTCHA banner
+- Brave: free tier credit card istiyor
 
-Şehirler: istanbul, ankara, izmir, bursa, antalya, adana, konya, gaziantep, kayseri, mersin, eskişehir, denizli, samsun, trabzon
+Eski Shopify pipeline'ı `storeleads.app` kullanıyordu (bot detection yok) ve mağaza siteleri Cloudflare arkasında değil → IG link'i çıkarabiliyorduk. Aynı mantığı Tsoft + Ticimax + IG related zincirine genişlettik.

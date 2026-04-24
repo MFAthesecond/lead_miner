@@ -1,7 +1,9 @@
 const { getSupabase, verifyCron } = require('../_lib/supabase');
 const { extractUsername, calcLiteScore } = require('../_lib/ig');
 
-const SEED_MIN_FOLLOWERS = parseInt(process.env.SEED_MIN_FOLLOWERS || '5000', 10);
+// Default 0: tum IG'leri al. Eskiden 5000+ siniri vardi, kaldirdik.
+// instagram_leads dashboard'unda follower araligi filtrelemesi var.
+const SEED_MIN_FOLLOWERS = parseInt(process.env.SEED_MIN_FOLLOWERS || '0', 10);
 const PAGE_SIZE = 1000;
 
 const CATEGORY_TO_NICHE = {
@@ -19,6 +21,14 @@ const CATEGORY_TO_NICHE = {
   'Sanat': 'sanat',
 };
 
+const SOURCE_MAP = {
+  'storeleads': 'seed_shopify',
+  'tsoft': 'seed_tsoft',
+  'ticimax': 'seed_ticimax',
+  'ideasoft': 'seed_ideasoft',
+  'manual': 'seed_manual',
+};
+
 module.exports = async function handler(req, res) {
   if (!verifyCron(req)) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -27,13 +37,12 @@ module.exports = async function handler(req, res) {
   const allRows = [];
   let from = 0;
   while (true) {
-    const { data, error } = await supabase
+    let q = supabase
       .from('shopify_stores')
-      .select('instagram, ig_followers, store_name, url, category')
-      .not('instagram', 'is', null)
-      .gte('ig_followers', SEED_MIN_FOLLOWERS)
-      .eq('is_shopify', true)
-      .range(from, from + PAGE_SIZE - 1);
+      .select('instagram, ig_followers, store_name, url, category, source')
+      .not('instagram', 'is', null);
+    if (SEED_MIN_FOLLOWERS > 0) q = q.gte('ig_followers', SEED_MIN_FOLLOWERS);
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
     if (error) return res.status(500).json({ error: error.message });
     if (!data || data.length === 0) break;
     allRows.push(...data);
@@ -70,7 +79,7 @@ module.exports = async function handler(req, res) {
       lite_score,
       shopify_url: r.url,
       niche: CATEGORY_TO_NICHE[r.category] || null,
-      source: 'seed_shopify',
+      source: SOURCE_MAP[r.source] || 'seed_shopify',
     });
   }
 
@@ -88,7 +97,6 @@ module.exports = async function handler(req, res) {
 
   return res.json({
     ok: true,
-    source: 'seed_shopify',
     eligible: allRows.length,
     candidates: upserts.length,
     inserted,
